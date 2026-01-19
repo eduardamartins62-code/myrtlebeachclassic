@@ -70,7 +70,14 @@ export default function HomePage() {
         .order("name", { ascending: true }),
     ]);
 
-    const roundIds = (roundsRes.data ?? []).map((round) => round.id);
+    const roundRows = (roundsRes.data ?? []) as RoundRow[];
+    const playerRows = (playersRes.data ?? []) as Array<{
+      id: string;
+      name: string;
+      handicap: number | null;
+      starting_score: number | null;
+    }>;
+    const roundIds = roundRows.map((round) => round.id);
     const scoresRes =
       roundIds.length > 0
         ? await supabase
@@ -80,9 +87,9 @@ export default function HomePage() {
         : { data: [] };
 
     setEvent(eventData);
-    setRounds((roundsRes.data ?? []) as RoundRow[]);
+    setRounds(roundRows);
     setPlayers(
-      (playersRes.data ?? []).map((player) => ({
+      playerRows.map((player) => ({
         id: player.id,
         name: player.name,
         handicap: player.handicap ?? 0,

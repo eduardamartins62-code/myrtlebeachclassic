@@ -184,7 +184,10 @@ export const buildTripStandings = (
 
     const netTotal =
       player.starting_score +
-      roundResults.reduce((total, value) => total + (value ?? 0), 0);
+      (roundResults ?? []).reduce<number>(
+        (total, value) => total + (value ?? 0),
+        0
+      );
 
     return {
       playerId: player.id,
