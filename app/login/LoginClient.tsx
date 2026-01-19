@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 
 export default function LoginClient() {
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") ?? "/";
+  const redirectTo = searchParams.get("redirectTo") ?? "/admin";
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);

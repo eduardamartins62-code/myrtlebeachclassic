@@ -294,7 +294,7 @@ export default function AdminClient() {
             Admin access required
           </h1>
           <p className="mt-2 text-sm text-slate-600">
-            You are logged in but not listed as an admin for this event.
+            You don&apos;t have admin access for this event.
           </p>
           <button
             className="mt-4 h-11 rounded-2xl bg-pine-600 px-4 text-sm font-semibold text-white"
