@@ -19,6 +19,12 @@ export type LeaderboardRow = {
   toPar: number;
 };
 
+export type RankedLeaderboardRow = LeaderboardRow & {
+  leaderDelta: number;
+  position: string;
+  rank: number;
+};
+
 const allocateHandicap = (handicap: number, holesEntered: number) => {
   if (holesEntered === 0) {
     return 0;
@@ -74,9 +80,25 @@ export const rankLeaderboard = (rows: LeaderboardRow[]) => {
     return [];
   }
   const leader = sorted[0].netTotal;
-  return sorted.map((row, index) => ({
-    ...row,
-    leaderDelta: row.netTotal - leader,
-    rank: index + 1
-  }));
+  const counts = sorted.reduce((map, row, index) => {
+    const current = map.get(row.netTotal);
+    if (current) {
+      current.count += 1;
+      return map;
+    }
+    map.set(row.netTotal, { count: 1, firstIndex: index });
+    return map;
+  }, new Map<number, { count: number; firstIndex: number }>());
+
+  return sorted.map((row, index) => {
+    const bucket = counts.get(row.netTotal);
+    const positionNumber = bucket ? bucket.firstIndex + 1 : index + 1;
+    const isTied = bucket ? bucket.count > 1 : false;
+    return {
+      ...row,
+      leaderDelta: row.netTotal - leader,
+      rank: index + 1,
+      position: isTied ? `T${positionNumber}` : `${positionNumber}`
+    };
+  });
 };

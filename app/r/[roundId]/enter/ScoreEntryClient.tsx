@@ -10,6 +10,7 @@ const showToastTimeout = 3000;
 type RoundRow = {
   id: string;
   name: string | null;
+  round_number: number | null;
   entry_pin: string | null;
   handicap_enabled: boolean;
 };
@@ -47,7 +48,7 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
     const [roundRes, playersRes] = await Promise.all([
       supabase
         .from("rounds")
-        .select("id,name,entry_pin,handicap_enabled")
+        .select("id,name,round_number,entry_pin,handicap_enabled")
         .eq("id", roundId)
         .maybeSingle(),
       supabase.from("players").select("id,name,handicap").eq("round_id", roundId)
@@ -177,7 +178,8 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
           Myrtle Beach Classic 2026 – Enter Scores
         </h1>
         <p className="mt-2 text-sm text-slate-600">
-          {round?.name ?? "Round"} • Course scores hole-by-hole.
+          {round?.round_number ? `Round ${round.round_number}` : "Round"} •{" "}
+          {round?.name ?? "Course"} • Course scores hole-by-hole.
         </p>
       </header>
 

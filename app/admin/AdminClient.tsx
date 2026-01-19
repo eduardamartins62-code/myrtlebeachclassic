@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -9,6 +9,7 @@ const defaultRoundName = "Myrtle Beach Classic 2026";
 type RoundRow = {
   id: string;
   name: string | null;
+  round_number: number | null;
   course: string | null;
   date: string | null;
   handicap_enabled: boolean;
@@ -23,10 +24,11 @@ type PlayerRow = {
 
 export default function AdminClient() {
   const [round, setRound] = useState<RoundRow | null>(null);
+  const [rounds, setRounds] = useState<RoundRow[]>([]);
   const [roundName, setRoundName] = useState(defaultRoundName);
+  const [roundNumber, setRoundNumber] = useState(1);
   const [course, setCourse] = useState("");
   const [date, setDate] = useState("");
-  const [handicapEnabled, setHandicapEnabled] = useState(true);
   const [entryPin, setEntryPin] = useState("");
   const [roundLoading, setRoundLoading] = useState(false);
   const [playerName, setPlayerName] = useState("");
@@ -45,15 +47,28 @@ export default function AdminClient() {
     return `/r/${round.id}`;
   }, [round]);
 
+  useEffect(() => {
+    const loadRounds = async () => {
+      const { data, error } = await supabase
+        .from("rounds")
+        .select("id,name,round_number,course,date,handicap_enabled,entry_pin")
+        .order("round_number", { ascending: true });
+      if (error) return;
+      setRounds(data ?? []);
+    };
+    void loadRounds();
+  }, []);
+
   const handleCreateRound = async () => {
     setRoundLoading(true);
     const { data, error } = await supabase
       .from("rounds")
       .insert({
         name: roundName || defaultRoundName,
+        round_number: roundNumber,
         course,
         date: date || null,
-        handicap_enabled: handicapEnabled,
+        handicap_enabled: true,
         entry_pin: entryPin || null
       })
       .select()
@@ -66,6 +81,7 @@ export default function AdminClient() {
     }
 
     setRound(data);
+    setRounds((prev) => [...prev, data]);
     showToast("Round created.");
     setRoundLoading(false);
   };
@@ -130,6 +146,20 @@ export default function AdminClient() {
         <h2 className="text-lg font-semibold text-slate-900">Create Round</h2>
         <div className="mt-4 grid gap-4">
           <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
+            Round Number
+            <select
+              className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
+              value={roundNumber}
+              onChange={(event) => setRoundNumber(Number(event.target.value))}
+            >
+              {[1, 2, 3, 4, 5].map((number) => (
+                <option key={number} value={number}>
+                  Round {number}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
             Round Name
             <input
               className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
@@ -154,15 +184,10 @@ export default function AdminClient() {
               onChange={(event) => setDate(event.target.value)}
             />
           </label>
-          <label className="flex items-center gap-3 text-sm font-semibold text-slate-600">
-            <input
-              checked={handicapEnabled}
-              className="h-4 w-4"
-              onChange={(event) => setHandicapEnabled(event.target.checked)}
-              type="checkbox"
-            />
-            Handicap Enabled
-          </label>
+          <div className="flex items-center gap-3 text-sm font-semibold text-slate-600">
+            <input checked className="h-4 w-4" disabled type="checkbox" />
+            Handicap Enabled (fixed for trip rounds)
+          </div>
           <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
             Entry PIN
             <input
@@ -182,6 +207,46 @@ export default function AdminClient() {
           </button>
         </div>
       </section>
+
+      {rounds.length > 0 && (
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Rounds</h2>
+          <div className="mt-4 grid gap-3">
+            {rounds.map((item) => (
+              <div
+                key={item.id}
+                className="flex flex-col gap-2 rounded-2xl border border-slate-100 px-4 py-3 text-sm"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-base font-semibold text-slate-900">
+                      Round {item.round_number ?? 1}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {item.name ?? defaultRoundName}
+                    </p>
+                  </div>
+                  <Link
+                    className="text-sm font-semibold text-pine-700"
+                    href={`/r/${item.id}`}
+                  >
+                    View
+                  </Link>
+                </div>
+                {(item.course || item.date) && (
+                  <p className="text-xs text-slate-500">
+                    {[item.course, item.date].filter(Boolean).join(" • ")}
+                  </p>
+                )}
+                <div className="flex items-center gap-4 text-xs text-slate-500">
+                  <span>Entry: /r/{item.id}/enter</span>
+                  <span>PIN {item.entry_pin ? "enabled" : "open"}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="rounded-3xl bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Add Players</h2>

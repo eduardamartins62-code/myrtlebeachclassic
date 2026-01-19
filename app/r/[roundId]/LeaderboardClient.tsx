@@ -6,7 +6,8 @@ import {
   buildLeaderboard,
   rankLeaderboard,
   type PlayerRow,
-  type ScoreRow
+  type ScoreRow,
+  type RankedLeaderboardRow
 } from "@/lib/leaderboard";
 
 const formatDelta = (value: number) => {
@@ -17,12 +18,20 @@ const formatDelta = (value: number) => {
 type RoundRow = {
   id: string;
   name: string | null;
+  round_number: number | null;
+  course: string | null;
+  date: string | null;
   handicap_enabled: boolean;
 };
+
+type ScoreWithUpdated = ScoreRow & { updated_at: string };
 
 type LeaderboardClientProps = {
   roundId: string;
 };
+
+const coursePar = 72;
+const parPerHole = coursePar / 18;
 
 export default function LeaderboardClient({ roundId }: LeaderboardClientProps) {
   const [round, setRound] = useState<RoundRow | null>(null);
@@ -38,13 +47,13 @@ export default function LeaderboardClient({ roundId }: LeaderboardClientProps) {
     const [roundRes, playersRes, scoresRes] = await Promise.all([
       supabase
         .from("rounds")
-        .select("id,name,handicap_enabled")
+        .select("id,name,round_number,course,date,handicap_enabled")
         .eq("id", roundId)
         .maybeSingle(),
       supabase.from("players").select("id,name,handicap").eq("round_id", roundId),
       supabase
         .from("scores")
-        .select("player_id,hole_number,strokes")
+        .select("player_id,hole_number,strokes,updated_at")
         .eq("round_id", roundId)
     ]);
 
@@ -60,8 +69,23 @@ export default function LeaderboardClient({ roundId }: LeaderboardClientProps) {
       name: player.name,
       handicap: player.handicap ?? 0
     })));
-    setScores(scoresRes.data ?? []);
-    setLastUpdated(new Date());
+    const scoreData = (scoresRes.data ?? []) as ScoreWithUpdated[];
+    setScores(
+      scoreData.map((score) => ({
+        player_id: score.player_id,
+        hole_number: score.hole_number,
+        strokes: score.strokes
+      }))
+    );
+    const latestUpdate = scoreData.reduce<Date | null>((latest, score) => {
+      if (!score.updated_at) return latest;
+      const updatedAt = new Date(score.updated_at);
+      if (!latest || updatedAt > latest) {
+        return updatedAt;
+      }
+      return latest;
+    }, null);
+    setLastUpdated(latestUpdate);
     setLoading(false);
   }, [roundId]);
 
@@ -103,94 +127,112 @@ export default function LeaderboardClient({ roundId }: LeaderboardClientProps) {
     };
   }, [roundId, loadData]);
 
-  const ranked = useMemo(() => {
+  const ranked = useMemo<RankedLeaderboardRow[]>(() => {
     if (!round) return [];
     const rows = buildLeaderboard(players, scores, round.handicap_enabled);
     return rankLeaderboard(rows);
   }, [players, scores, round]);
 
+  const eventName = round?.name ?? "Myrtle Beach Classic 2026";
+  const roundLabel = round?.round_number
+    ? `Round ${round.round_number}`
+    : "Round";
+  const roundDetail = `${eventName} – ${roundLabel}`;
+  const courseDetail = round?.course ?? null;
+  const dateDetail = round?.date
+    ? new Date(round.date).toLocaleDateString()
+    : null;
+  const lastUpdatedLabel = lastUpdated
+    ? lastUpdated.toLocaleTimeString()
+    : "Awaiting updates";
+
+  const leaderNet = ranked[0]?.netTotal ?? null;
+
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8">
-      <header className="flex flex-col gap-2 rounded-3xl bg-white p-6 shadow-lg shadow-pine-100/70">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-pine-600">
-          Myrtle Beach Classic 2026
-        </p>
-        <h1 className="text-2xl font-semibold text-slate-900">
-          Myrtle Beach Classic 2026 – Live Leaderboard
-        </h1>
-        <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
-          <span className="rounded-full bg-pine-50 px-3 py-1 text-xs font-semibold text-pine-700">
-            {round?.name ?? "Round"}
-          </span>
-          {lastUpdated && (
-            <span>Last updated {lastUpdated.toLocaleTimeString()}</span>
-          )}
-        </div>
-      </header>
+    <main className="flex min-h-screen w-full flex-col items-center bg-slate-950 px-4 py-8 text-white">
+      <div className="w-full max-w-4xl">
+        {error && (
+          <div className="mb-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+            {error}
+          </div>
+        )}
 
-      {error && (
-        <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
+        <section className="w-full rounded-3xl bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.6)] sm:p-6">
+          <header className="flex flex-col gap-2 border-b border-slate-700/70 pb-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+              Myrtle Beach Classic 2026
+            </p>
+            <h1 className="text-xl font-semibold text-white sm:text-2xl">
+              {roundDetail}
+            </h1>
+            {(courseDetail || dateDetail) && (
+              <p className="text-sm text-slate-300">
+                {[courseDetail, dateDetail].filter(Boolean).join(" • ")}
+              </p>
+            )}
+          </header>
 
-      <section className="rounded-3xl bg-white p-5 shadow-sm">
-        <div className="grid grid-cols-[2fr_repeat(3,1fr)_0.8fr] gap-3 border-b border-slate-100 pb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-          <span>Player</span>
-          <span className="text-right">Gross</span>
-          <span className="text-right">Net</span>
-          <span className="text-right">Thru</span>
-          <span className="text-right">+/-</span>
-        </div>
+          <div className="mt-4 flex items-center justify-between border-b border-slate-700/70 px-4 pb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+            <span className="w-12">Pos</span>
+            <span className="flex-1 px-2">Player</span>
+            <span className="w-16 text-right">Total</span>
+            <span className="w-12 text-right">Thru</span>
+            <span className="w-16 text-right">Today</span>
+          </div>
 
-        <div className="divide-y divide-slate-100">
-          {loading && (
-            <div className="py-6 text-center text-sm text-slate-500">
-              Loading leaderboard...
-            </div>
-          )}
-
-          {!loading && ranked.length === 0 && (
-            <div className="py-6 text-center text-sm text-slate-500">
-              No players yet. Add players in the admin panel.
-            </div>
-          )}
-
-          {ranked.map((row) => (
-            <div
-              key={row.playerId}
-              className="grid grid-cols-[2fr_repeat(3,1fr)_0.8fr] items-center gap-3 py-4 text-sm"
-            >
-              <div>
-                <p className="text-base font-semibold text-slate-900">
-                  {row.name}
-                </p>
-                <p className="text-xs text-slate-500">Rank #{row.rank}</p>
+          <div className="flex flex-col">
+            {loading && (
+              <div className="py-6 text-center text-sm text-slate-400">
+                Loading leaderboard...
               </div>
-              <p className="text-right font-semibold text-slate-700">
-                {row.grossTotal || "-"}
-              </p>
-              <p className="text-right font-semibold text-slate-900">
-                {row.netTotal || "-"}
-              </p>
-              <p className="text-right text-slate-600">
-                {row.thru || "-"}
-              </p>
-              <p
-                className={`text-right font-semibold ${
-                  row.leaderDelta === 0
-                    ? "text-pine-600"
-                    : row.leaderDelta > 0
-                    ? "text-red-500"
-                    : "text-pine-600"
-                }`}
-              >
-                {formatDelta(row.leaderDelta)}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
+            )}
+
+            {!loading && ranked.length === 0 && (
+              <div className="py-6 text-center text-sm text-slate-400">
+                No players yet. Add players in the admin panel.
+              </div>
+            )}
+
+            {ranked.map((row) => {
+              const totalToPar = row.thru
+                ? row.netTotal - parPerHole * row.thru
+                : null;
+              const todayToPar = totalToPar;
+              const isLeader = leaderNet !== null && row.netTotal === leaderNet;
+              const thruLabel = row.thru >= 18 ? "F" : row.thru || "-";
+              return (
+                <div
+                  key={row.playerId}
+                  className={`flex items-center justify-between border-b border-slate-700/70 px-4 py-2 text-sm sm:text-base ${
+                    isLeader ? "bg-slate-800/80" : "bg-slate-900/80"
+                  }`}
+                >
+                  <span className="w-12 text-base font-semibold text-white">
+                    {row.position}
+                  </span>
+                  <span className="flex-1 px-2 font-semibold text-white">
+                    {row.name}
+                  </span>
+                  <span className="w-16 text-right font-semibold text-white">
+                    {totalToPar === null ? "-" : formatDelta(totalToPar)}
+                  </span>
+                  <span className="w-12 text-right text-slate-200">
+                    {thruLabel}
+                  </span>
+                  <span className="w-16 text-right font-semibold text-slate-100">
+                    {todayToPar === null ? "-" : formatDelta(todayToPar)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <footer className="mt-3 flex justify-between px-4 text-xs text-slate-400">
+            <span>Handicap adjusted</span>
+            <span>Last updated: {lastUpdatedLabel}</span>
+          </footer>
+        </section>
+      </div>
+    </main>
   );
 }
