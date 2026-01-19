@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServer";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 export async function POST(request: Request) {
   const supabase = createSupabaseServerClient();
+  const supabaseAdmin = getSupabaseAdmin();
   const {
     data: { user }
   } = await supabase.auth.getUser();
