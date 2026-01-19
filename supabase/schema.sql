@@ -3,6 +3,7 @@ create extension if not exists "uuid-ossp";
 create table if not exists rounds (
   id uuid primary key default uuid_generate_v4(),
   name text not null default 'Myrtle Beach Classic 2026',
+  round_number int not null default 1 check (round_number between 1 and 5),
   course text,
   date date,
   handicap_enabled boolean not null default true,
