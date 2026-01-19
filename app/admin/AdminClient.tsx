@@ -106,16 +106,19 @@ export default function AdminClient() {
       supabase.auth.getUser()
     ]);
 
-    setRounds((roundsRes.data ?? []) as RoundRow[]);
-    setPlayers((playersRes.data ?? []) as PlayerRow[]);
-    setAdmins((adminsRes.data ?? []) as AdminRow[]);
+    const roundRows = (roundsRes.data ?? []) as RoundRow[];
+    const playerRows = (playersRes.data ?? []) as PlayerRow[];
+    const adminRows = (adminsRes.data ?? []) as AdminRow[];
+
+    setRounds(roundRows);
+    setPlayers(playerRows);
+    setAdmins(adminRows);
 
     const user = userRes.data.user;
     setUserId(user?.id ?? null);
     setIsAdmin(
       Boolean(
-        user &&
-          (adminsRes.data ?? []).some((admin) => admin.user_id === user.id)
+        user && adminRows.some((admin) => admin.user_id === user.id)
       )
     );
   }, []);

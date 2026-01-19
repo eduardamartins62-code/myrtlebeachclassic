@@ -84,8 +84,14 @@ export default function LeaderboardClient({ roundId }: LeaderboardClientProps) {
 
     setRound(roundRes.data as RoundMeta);
     setEvent(eventRes.data ?? null);
+    const playerRows = (playersRes.data ?? []) as Array<{
+      id: string;
+      name: string;
+      handicap: number | null;
+      starting_score: number | null;
+    }>;
     setPlayers(
-      (playersRes.data ?? []).map((player) => ({
+      playerRows.map((player) => ({
         id: player.id,
         name: player.name,
         handicap: player.handicap ?? 0,

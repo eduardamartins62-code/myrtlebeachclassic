@@ -88,8 +88,13 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
 
     setRound(roundRes.data as RoundRow);
     setEvent(eventRes.data ?? null);
+    const playerRows = (playersRes.data ?? []) as Array<{
+      id: string;
+      name: string;
+      handicap: number | null;
+    }>;
     setPlayers(
-      (playersRes.data ?? []).map((player) => ({
+      playerRows.map((player) => ({
         id: player.id,
         name: player.name,
         handicap: player.handicap ?? 0
@@ -124,7 +129,8 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
     }
 
     const nextScores: Record<string, number> = {};
-    (data ?? []).forEach((score) => {
+    const scoreRows = (data ?? []) as ScoreRow[];
+    scoreRows.forEach((score) => {
       nextScores[score.player_id] = score.strokes;
     });
     setScores(nextScores);
