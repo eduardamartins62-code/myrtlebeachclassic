@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 
 const holes = Array.from({ length: 18 }, (_, index) => index + 1);
@@ -13,6 +14,13 @@ type RoundRow = {
   round_number: number | null;
   entry_pin: string | null;
   handicap_enabled: boolean;
+  event_id: string;
+  course: string | null;
+};
+
+type EventRow = {
+  id: string;
+  name: string;
 };
 
 type PlayerRow = {
@@ -29,14 +37,19 @@ type ScoreRow = {
 
 export default function ScoreEntryClient({ roundId }: { roundId: string }) {
   const [round, setRound] = useState<RoundRow | null>(null);
+  const [event, setEvent] = useState<EventRow | null>(null);
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [scores, setScores] = useState<Record<string, number>>({});
   const [selectedHole, setSelectedHole] = useState(1);
   const [pin, setPin] = useState("");
   const [authorized, setAuthorized] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ message: string; tone: "ok" | "error" } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    tone: "ok" | "error";
+  } | null>(null);
 
   const showToast = useCallback((message: string, tone: "ok" | "error") => {
     setToast({ message, tone });
@@ -45,22 +58,36 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
 
   const loadRound = useCallback(async () => {
     setLoading(true);
-    const [roundRes, playersRes] = await Promise.all([
-      supabase
-        .from("rounds")
-        .select("id,name,round_number,entry_pin,handicap_enabled")
-        .eq("id", roundId)
-        .maybeSingle(),
-      supabase.from("players").select("id,name,handicap").eq("round_id", roundId)
-    ]);
+    const roundRes = await supabase
+      .from("rounds")
+      .select(
+        "id,name,round_number,entry_pin,handicap_enabled,event_id,course"
+      )
+      .eq("id", roundId)
+      .maybeSingle();
 
-    if (roundRes.error || playersRes.error) {
+    if (roundRes.error || !roundRes.data) {
       showToast("Unable to load round.", "error");
       setLoading(false);
       return;
     }
 
-    setRound(roundRes.data ?? null);
+    const [eventRes, playersRes, userRes] = await Promise.all([
+      supabase
+        .from("events")
+        .select("id,name")
+        .eq("id", roundRes.data.event_id)
+        .maybeSingle(),
+      supabase
+        .from("players")
+        .select("id,name,handicap")
+        .eq("event_id", roundRes.data.event_id)
+        .order("name", { ascending: true }),
+      supabase.auth.getUser()
+    ]);
+
+    setRound(roundRes.data as RoundRow);
+    setEvent(eventRes.data ?? null);
     setPlayers(
       (playersRes.data ?? []).map((player) => ({
         id: player.id,
@@ -68,6 +95,19 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
         handicap: player.handicap ?? 0
       }))
     );
+
+    if (userRes.data.user) {
+      const adminRes = await supabase
+        .from("admins")
+        .select("user_id")
+        .eq("event_id", roundRes.data.event_id)
+        .eq("user_id", userRes.data.user.id)
+        .maybeSingle();
+      setIsAdmin(Boolean(adminRes.data));
+    } else {
+      setIsAdmin(false);
+    }
+
     setLoading(false);
   }, [roundId, showToast]);
 
@@ -122,7 +162,10 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
       });
       return;
     }
-    setScores((prev) => ({ ...prev, [playerId]: Math.max(1, Math.min(20, parsed)) }));
+    setScores((prev) => ({
+      ...prev,
+      [playerId]: Math.max(1, Math.min(20, parsed))
+    }));
   };
 
   const handleSave = async () => {
@@ -168,18 +211,39 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
     );
   }
 
+  if (!isAdmin) {
+    return (
+      <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 py-8">
+        <div className="rounded-3xl bg-white p-6 shadow-sm">
+          <h1 className="text-xl font-semibold text-slate-900">
+            Admin access required
+          </h1>
+          <p className="mt-2 text-sm text-slate-600">
+            You are logged in but not listed as an admin for this event.
+          </p>
+          <Link
+            className="mt-4 inline-flex items-center justify-center rounded-2xl bg-pine-600 px-4 py-2 text-sm font-semibold text-white"
+            href="/admin"
+          >
+            Go to Admin Dashboard
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8">
       <header className="rounded-3xl bg-white p-6 shadow-lg shadow-pine-100/70">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-pine-600">
-          Myrtle Beach Classic 2026
+          {event?.name ?? "Myrtle Beach Classic 2026"}
         </p>
         <h1 className="text-2xl font-semibold text-slate-900">
-          Myrtle Beach Classic 2026 – Enter Scores
+          {event?.name ?? "Myrtle Beach Classic 2026"} – Enter Scores
         </h1>
         <p className="mt-2 text-sm text-slate-600">
           {round?.round_number ? `Round ${round.round_number}` : "Round"} •{" "}
-          {round?.name ?? "Course"} • Course scores hole-by-hole.
+          {round?.course ?? round?.name ?? "Course"} • Course scores hole-by-hole.
         </p>
       </header>
 
