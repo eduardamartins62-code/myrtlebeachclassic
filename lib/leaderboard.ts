@@ -1,8 +1,7 @@
 export type EventRound = {
   id: string;
   round_number: number;
-  course_par: number;
-  handicap_enabled: boolean;
+  par: number;
 };
 
 export type PlayerRow = {
@@ -81,11 +80,9 @@ const summarizeRound = (
 ): RoundSummary => {
   const gross = scores.reduce((total, score) => total + score.strokes, 0);
   const holesEntered = new Set(scores.map((score) => score.hole_number)).size;
-  const allocated = round.handicap_enabled
-    ? allocateHandicap(player.handicap, holesEntered)
-    : 0;
+  const allocated = allocateHandicap(player.handicap, holesEntered);
   const net = gross - allocated;
-  const parForHoles = calculateParForHoles(round.course_par, holesEntered);
+  const parForHoles = calculateParForHoles(round.par, holesEntered);
   const netToPar = holesEntered > 0 ? net - parForHoles : null;
 
   return {
