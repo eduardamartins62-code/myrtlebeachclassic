@@ -229,6 +229,27 @@ export default function AdminClient() {
     setPlayerLoading(false);
   };
 
+  const handleDeletePlayer = async (playerId: string, playerName: string) => {
+    if (!isAdmin) {
+      showToast("Admin access required to delete players.");
+      return;
+    }
+    const confirmed = window.confirm(
+      `Delete player ${playerName}? This will remove all their scores.`
+    );
+    if (!confirmed) return;
+
+    const { error } = await supabase.from("players").delete().eq("id", playerId);
+
+    if (error) {
+      showToast("Failed to delete player.");
+      return;
+    }
+
+    setPlayers((prev) => prev.filter((player) => player.id !== playerId));
+    showToast("Player deleted.");
+  };
+
   const handleInviteAdmin = async () => {
     if (!event) return;
     if (!inviteEmail.trim()) {
@@ -537,14 +558,23 @@ export default function AdminClient() {
             {players.map((player) => (
               <div
                 key={player.id}
-                className="flex items-center justify-between rounded-2xl border border-slate-100 px-4 py-3 text-sm"
+                className="flex flex-col gap-2 rounded-2xl border border-slate-100 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
               >
-                <span className="font-semibold text-slate-900">
-                  {player.name}
-                </span>
-                <span className="text-slate-500">
-                  Handicap {player.handicap} • Start {player.starting_score}
-                </span>
+                <div>
+                  <span className="font-semibold text-slate-900">
+                    {player.name}
+                  </span>
+                  <p className="text-xs text-slate-500">
+                    Handicap {player.handicap} • Start {player.starting_score}
+                  </p>
+                </div>
+                <button
+                  className="inline-flex h-9 items-center justify-center rounded-xl border border-red-200 px-3 text-xs font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50"
+                  onClick={() => handleDeletePlayer(player.id, player.name)}
+                  type="button"
+                >
+                  Delete
+                </button>
               </div>
             ))}
           </div>
