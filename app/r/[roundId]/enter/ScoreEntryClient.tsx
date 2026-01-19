@@ -207,6 +207,66 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
     setSaving(false);
   };
 
+  const handleClearScore = async (playerId: string, hole: number) => {
+    if (!round) return;
+    if (!isAdmin) {
+      showToast("Admin access required to remove scores.", "error");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("scores")
+      .delete()
+      .eq("round_id", roundId)
+      .eq("player_id", playerId)
+      .eq("hole_number", hole);
+
+    if (error) {
+      showToast("Failed to remove score.", "error");
+      return;
+    }
+
+    setScores((prev) => {
+      const next = { ...prev };
+      delete next[playerId];
+      return next;
+    });
+    showToast("Score removed.", "ok");
+  };
+
+  const handleClearPlayerRound = async (
+    playerId: string,
+    playerName: string
+  ) => {
+    if (!round) return;
+    if (!isAdmin) {
+      showToast("Admin access required to remove scores.", "error");
+      return;
+    }
+    const confirmed = window.confirm(
+      `Clear all scores for ${playerName} in this round?`
+    );
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from("scores")
+      .delete()
+      .eq("round_id", roundId)
+      .eq("player_id", playerId);
+
+    if (error) {
+      showToast("Failed to clear scores.", "error");
+      return;
+    }
+
+    setScores((prev) => {
+      const next = { ...prev };
+      delete next[playerId];
+      return next;
+    });
+    showToast("Scores cleared for player.", "ok");
+  };
+
   if (loading) {
     return (
       <main className="mx-auto flex w-full max-w-2xl flex-col px-4 py-8">
@@ -318,7 +378,7 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
               {players.map((player) => (
                 <div
                   key={player.id}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 px-4 py-3"
+                  className="flex flex-col gap-3 rounded-2xl border border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div>
                     <p className="text-sm font-semibold text-slate-900">
@@ -328,18 +388,38 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
                       Handicap {player.handicap}
                     </p>
                   </div>
-                  <input
-                    className="h-12 w-20 rounded-2xl border border-slate-200 text-center text-lg font-semibold text-slate-900 focus:border-pine-500 focus:outline-none"
-                    inputMode="numeric"
-                    max={20}
-                    min={1}
-                    pattern="[0-9]*"
-                    type="number"
-                    value={scores[player.id] ?? ""}
-                    onChange={(event) =>
-                      handleScoreChange(player.id, event.target.value)
-                    }
-                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      className="h-12 w-20 rounded-2xl border border-slate-200 text-center text-lg font-semibold text-slate-900 focus:border-pine-500 focus:outline-none"
+                      inputMode="numeric"
+                      max={20}
+                      min={1}
+                      pattern="[0-9]*"
+                      type="number"
+                      value={scores[player.id] ?? ""}
+                      onChange={(event) =>
+                        handleScoreChange(player.id, event.target.value)
+                      }
+                    />
+                    <button
+                      className="h-10 rounded-xl border border-red-200 px-3 text-xs font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50"
+                      onClick={() =>
+                        handleClearScore(player.id, selectedHole)
+                      }
+                      type="button"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      className="h-10 rounded-xl border border-red-200 px-3 text-xs font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50"
+                      onClick={() =>
+                        handleClearPlayerRound(player.id, player.name)
+                      }
+                      type="button"
+                    >
+                      Clear round
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
