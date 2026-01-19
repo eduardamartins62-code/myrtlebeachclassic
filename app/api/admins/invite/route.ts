@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   const normalizedRole = body.role === "owner" ? "owner" : "admin";
 
   const { data: adminRow } = await supabaseAdmin
-    .from("admins")
+    .from("event_admins")
     .select("user_id")
     .eq("event_id", body.eventId)
     .eq("user_id", user.id)
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unable to invite user" }, { status: 500 });
   }
 
-  await supabaseAdmin.from("admins").upsert({
+  await supabaseAdmin.from("event_admins").upsert({
     event_id: body.eventId,
     user_id: invite.user.id,
     role: normalizedRole

@@ -13,17 +13,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = (await request.json()) as { name?: string; year?: number };
+  const body = (await request.json()) as { name?: string; slug?: string };
   const eventName = body.name?.trim();
+  const eventSlug = body.slug?.trim();
 
-  if (!eventName) {
+  if (!eventName || !eventSlug) {
     return NextResponse.json({ error: "Missing event name" }, { status: 400 });
   }
 
   const { data: existingEvent } = await supabaseAdmin
     .from("events")
     .select("id")
-    .eq("name", eventName)
+    .eq("slug", eventSlug)
     .maybeSingle();
 
   let eventId = existingEvent?.id;
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
       .from("events")
       .insert({
         name: eventName,
-        year: body.year ?? null
+        slug: eventSlug
       })
       .select("id")
       .single();
@@ -46,14 +47,14 @@ export async function POST(request: Request) {
   }
 
   if (!existingEvent) {
-    await supabaseAdmin.from("admins").upsert({
+    await supabaseAdmin.from("event_admins").upsert({
       event_id: eventId,
       user_id: user.id,
       role: "owner"
     });
   } else {
     const { data: adminRow } = await supabaseAdmin
-      .from("admins")
+      .from("event_admins")
       .select("user_id")
       .eq("event_id", eventId)
       .eq("user_id", user.id)

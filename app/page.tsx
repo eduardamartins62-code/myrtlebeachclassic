@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { EVENT_NAME, EVENT_SLUG } from "@/lib/event";
 import { supabase } from "@/lib/supabaseClient";
 import {
   buildTripStandings,
@@ -13,16 +14,13 @@ import {
   type RankedTripStandingRow
 } from "@/lib/leaderboard";
 
-const EVENT_NAME = "Myrtle Beach Classic 2026";
-
 type EventRow = {
   id: string;
   name: string;
-  year: number | null;
+  slug: string;
 };
 
 type RoundRow = EventRound & {
-  name: string | null;
   course: string | null;
   date: string | null;
 };
@@ -46,8 +44,8 @@ export default function HomePage() {
     const [{ data: eventData }, userRes] = await Promise.all([
       supabase
         .from("events")
-        .select("id,name,year")
-        .eq("name", EVENT_NAME)
+        .select("id,name,slug")
+        .eq("slug", EVENT_SLUG)
         .maybeSingle(),
       supabase.auth.getUser()
     ]);
@@ -68,7 +66,7 @@ export default function HomePage() {
       supabase
         .from("rounds")
         .select(
-          "id,event_id,round_number,name,course,date,course_par,handicap_enabled"
+          "id,event_id,round_number,course,date,par"
         )
         .eq("event_id", eventData.id)
         .order("round_number", { ascending: true }),
@@ -79,7 +77,7 @@ export default function HomePage() {
         .order("name", { ascending: true }),
       user
         ? supabase
-            .from("admins")
+            .from("event_admins")
             .select("user_id")
             .eq("event_id", eventData.id)
             .eq("user_id", user.id)
@@ -454,7 +452,7 @@ export default function HomePage() {
                     Round {round.round_number}
                   </span>
                   <span className="text-xs text-white/60">
-                    {round.name ?? EVENT_NAME}
+                    {event?.name ?? EVENT_NAME}
                   </span>
                   {(round.course || round.date) && (
                     <span className="text-xs text-white/60">

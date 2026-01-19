@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import AdminShell from "@/app/components/AdminShell";
+import { EVENT_NAME } from "@/lib/event";
 import { supabase } from "@/lib/supabaseClient";
+import { useAdminStatus } from "@/lib/useAdminStatus";
 
 const holes = Array.from({ length: 18 }, (_, index) => index + 1);
 
@@ -10,12 +13,11 @@ const showToastTimeout = 3000;
 
 type RoundRow = {
   id: string;
-  name: string | null;
   round_number: number | null;
   entry_pin: string | null;
-  handicap_enabled: boolean;
   event_id: string;
   course: string | null;
+  date: string | null;
 };
 
 type EventRow = {
@@ -43,13 +45,15 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
   const [selectedHole, setSelectedHole] = useState(1);
   const [pin, setPin] = useState("");
   const [authorized, setAuthorized] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
     tone: "ok" | "error";
   } | null>(null);
+  const { isAdmin, isAuthenticated, loading: authLoading } = useAdminStatus(
+    round?.event_id
+  );
 
   const showToast = useCallback((message: string, tone: "ok" | "error") => {
     setToast({ message, tone });
@@ -60,9 +64,7 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
     setLoading(true);
     const roundRes = await supabase
       .from("rounds")
-      .select(
-        "id,name,round_number,entry_pin,handicap_enabled,event_id,course"
-      )
+      .select("id,round_number,entry_pin,event_id,course,date")
       .eq("id", roundId)
       .maybeSingle();
 
@@ -72,7 +74,7 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
       return;
     }
 
-    const [eventRes, playersRes, userRes] = await Promise.all([
+    const [eventRes, playersRes] = await Promise.all([
       supabase
         .from("events")
         .select("id,name")
@@ -83,7 +85,6 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
         .select("id,name,handicap")
         .eq("event_id", roundRes.data.event_id)
         .order("name", { ascending: true }),
-      supabase.auth.getUser()
     ]);
 
     setRound(roundRes.data as RoundRow);
@@ -100,18 +101,6 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
         handicap: player.handicap ?? 0
       }))
     );
-
-    if (userRes.data.user) {
-      const adminRes = await supabase
-        .from("admins")
-        .select("user_id")
-        .eq("event_id", roundRes.data.event_id)
-        .eq("user_id", userRes.data.user.id)
-        .maybeSingle();
-      setIsAdmin(Boolean(adminRes.data));
-    } else {
-      setIsAdmin(false);
-    }
 
     setLoading(false);
   }, [roundId, showToast]);
@@ -267,7 +256,7 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
     showToast("Scores cleared for player.", "ok");
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <main className="mx-auto flex w-full max-w-2xl flex-col px-4 py-8">
         <div className="rounded-3xl bg-white p-6 shadow-sm">
@@ -277,41 +266,60 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
     );
   }
 
+  if (!isAuthenticated) {
+    return (
+      <AdminShell
+        title="Admin sign-in required"
+        subtitle={EVENT_NAME}
+        description="You must be logged in to enter scores."
+      >
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <Link
+            className="inline-flex h-11 items-center justify-center rounded-2xl bg-pine-600 px-4 text-sm font-semibold text-white"
+            href="/login"
+          >
+            Go to Login
+          </Link>
+        </section>
+      </AdminShell>
+    );
+  }
+
   if (!isAdmin) {
     return (
-      <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 py-8">
-        <div className="rounded-3xl bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-semibold text-slate-900">
-            Admin access required
-          </h1>
-          <p className="mt-2 text-sm text-slate-600">
-            You are logged in but not listed as an admin for this event.
-          </p>
+      <AdminShell
+        title="Admin access required"
+        subtitle={event?.name ?? EVENT_NAME}
+        description="You are logged in but not listed as an admin for this event."
+      >
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
           <Link
-            className="mt-4 inline-flex items-center justify-center rounded-2xl bg-pine-600 px-4 py-2 text-sm font-semibold text-white"
+            className="inline-flex h-11 items-center justify-center rounded-2xl bg-pine-600 px-4 text-sm font-semibold text-white"
             href="/admin"
           >
             Go to Admin Dashboard
           </Link>
-        </div>
-      </main>
+        </section>
+      </AdminShell>
     );
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8">
-      <header className="rounded-3xl bg-white p-6 shadow-lg shadow-pine-100/70">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-pine-600">
-          {event?.name ?? "Myrtle Beach Classic 2026"}
-        </p>
-        <h1 className="text-2xl font-semibold text-slate-900">
-          {event?.name ?? "Myrtle Beach Classic 2026"} – Enter Scores
-        </h1>
-        <p className="mt-2 text-sm text-slate-600">
-          {round?.round_number ? `Round ${round.round_number}` : "Round"} •{" "}
-          {round?.course ?? round?.name ?? "Course"} • Course scores hole-by-hole.
-        </p>
-      </header>
+    <AdminShell
+      title="Enter Scores"
+      subtitle={event?.name ?? EVENT_NAME}
+      description={`${round?.round_number ? `Round ${round.round_number}` : "Round"} • ${
+        round?.course ?? "Course"
+      } • ${round?.date ? new Date(round.date).toLocaleDateString() : "Date TBA"}`}
+      actions={
+        <Link
+          className="inline-flex h-10 items-center justify-center rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-700"
+          href="/admin"
+        >
+          Back to Admin
+        </Link>
+      }
+    >
 
       {toast && (
         <div
@@ -435,6 +443,6 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
           </div>
         </section>
       )}
-    </main>
+    </AdminShell>
   );
 }

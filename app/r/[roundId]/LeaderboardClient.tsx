@@ -17,7 +17,6 @@ const formatDelta = (value: number) => {
 };
 
 type RoundMeta = EventRound & {
-  name: string | null;
   course: string | null;
   date: string | null;
   event_id: string;
@@ -49,7 +48,7 @@ export default function LeaderboardClient({ roundId }: LeaderboardClientProps) {
     const roundRes = await supabase
       .from("rounds")
       .select(
-        "id,name,round_number,course,date,handicap_enabled,course_par,event_id"
+        "id,round_number,course,date,par,event_id"
       )
       .eq("id", roundId)
       .maybeSingle();
