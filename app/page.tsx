@@ -36,33 +36,25 @@ export default function HomePage() {
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [scores, setScores] = useState<ScoreRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   const loadTripData = useCallback(async () => {
     setLoading(true);
-    const [{ data: eventData }, userRes] = await Promise.all([
-      supabase
-        .from("events")
-        .select("id,name,slug")
-        .eq("slug", EVENT_SLUG)
-        .maybeSingle(),
-      supabase.auth.getUser()
-    ]);
-    const user = userRes.data.user;
-    setUserEmail(user?.email ?? null);
+    const { data: eventData } = await supabase
+      .from("events")
+      .select("id,name,slug")
+      .eq("slug", EVENT_SLUG)
+      .maybeSingle();
 
     if (!eventData) {
       setEvent(null);
       setRounds([]);
       setPlayers([]);
       setScores([]);
-      setIsAdmin(false);
       setLoading(false);
       return;
     }
 
-    const [roundsRes, playersRes, adminRes] = await Promise.all([
+    const [roundsRes, playersRes] = await Promise.all([
       supabase
         .from("rounds")
         .select(
@@ -74,15 +66,7 @@ export default function HomePage() {
         .from("players")
         .select("id,name,handicap,starting_score")
         .eq("event_id", eventData.id)
-        .order("name", { ascending: true }),
-      user
-        ? supabase
-            .from("event_admins")
-            .select("user_id")
-            .eq("event_id", eventData.id)
-            .eq("user_id", user.id)
-            .maybeSingle()
-        : Promise.resolve({ data: null })
+        .order("name", { ascending: true })
     ]);
 
     const roundRows = (roundsRes.data ?? []) as RoundRow[];
@@ -112,7 +96,6 @@ export default function HomePage() {
       }))
     );
     setScores((scoresRes.data ?? []) as ScoreRow[]);
-    setIsAdmin(Boolean(adminRes.data));
     setLoading(false);
   }, []);
 
@@ -175,8 +158,6 @@ export default function HomePage() {
   }, [event, players, rounds, scores]);
 
   const eventLabel = event?.name ?? EVENT_NAME;
-  const showLoggedInStatus = Boolean(userEmail);
-
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <div className="relative overflow-hidden">
@@ -205,36 +186,18 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                {showLoggedInStatus ? (
-                  <>
-                    <span className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
-                      Logged in as {userEmail}
-                    </span>
-                    {isAdmin && (
-                      <Link
-                        className="rounded-full bg-emerald-400 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-950 transition hover:bg-emerald-300"
-                        href="/admin"
-                      >
-                        Admin
-                      </Link>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <Link
-                      className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/80 transition hover:border-emerald-300 hover:text-white"
-                      href="/admin"
-                    >
-                      Admin Portal
-                    </Link>
-                    <Link
-                      className="rounded-full bg-emerald-400 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-950 transition hover:bg-emerald-300"
-                      href="/admin"
-                    >
-                      Manage Roster
-                    </Link>
-                  </>
-                )}
+                <Link
+                  className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/80 transition hover:border-emerald-300 hover:text-white"
+                  href="/admin"
+                >
+                  Admin Portal
+                </Link>
+                <Link
+                  className="rounded-full bg-emerald-400 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-950 transition hover:bg-emerald-300"
+                  href="/admin"
+                >
+                  Manage Roster
+                </Link>
               </div>
             </div>
             <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
@@ -314,14 +277,12 @@ export default function HomePage() {
                 Head to the admin dashboard to create the Myrtle Beach Classic
                 2026 event and rounds.
               </p>
-              {isAdmin && (
-                <Link
-                  className="mt-4 inline-flex items-center justify-center rounded-full bg-emerald-400 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-950"
-                  href="/admin"
-                >
-                  Go to Admin
-                </Link>
-              )}
+              <Link
+                className="mt-4 inline-flex items-center justify-center rounded-full bg-emerald-400 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-950"
+                href="/admin"
+              >
+                Go to Admin
+              </Link>
             </section>
           )}
 
@@ -427,14 +388,6 @@ export default function HomePage() {
                   Schedule &amp; Course Notes
                 </h2>
               </div>
-              {isAdmin && (
-                <Link
-                  className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200"
-                  href="/admin"
-                >
-                  Admin
-                </Link>
-              )}
             </div>
             {rounds.length === 0 && (
               <div className="rounded-2xl border border-dashed border-emerald-200/40 bg-white/5 px-5 py-4 text-sm text-white/70">
