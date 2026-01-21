@@ -198,10 +198,6 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
 
   const handleClearScore = async (playerId: string, hole: number) => {
     if (!round) return;
-    if (!isAdmin) {
-      showToast("Admin access required to remove scores.", "error");
-      return;
-    }
 
     const { error } = await supabase
       .from("scores")
