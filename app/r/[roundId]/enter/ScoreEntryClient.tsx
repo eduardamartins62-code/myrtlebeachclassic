@@ -5,7 +5,6 @@ import Link from "next/link";
 import AdminShell from "@/app/components/AdminShell";
 import { EVENT_NAME } from "@/lib/event";
 import { supabase } from "@/lib/supabaseClient";
-import { useAdminStatus } from "@/lib/useAdminStatus";
 
 const holes = Array.from({ length: 18 }, (_, index) => index + 1);
 
@@ -51,9 +50,6 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
     message: string;
     tone: "ok" | "error";
   } | null>(null);
-  const { isAdmin, isAuthenticated, loading: authLoading } = useAdminStatus(
-    round?.event_id
-  );
 
   const showToast = useCallback((message: string, tone: "ok" | "error") => {
     setToast({ message, tone });
@@ -198,11 +194,6 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
 
   const handleClearScore = async (playerId: string, hole: number) => {
     if (!round) return;
-    if (!isAdmin) {
-      showToast("Admin access required to remove scores.", "error");
-      return;
-    }
-
     const { error } = await supabase
       .from("scores")
       .delete()
@@ -220,7 +211,7 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
       delete next[playerId];
       return next;
     });
-    showToast("Score removed.", "ok");
+    showToast("Score removed", "ok");
   };
 
   const handleClearPlayerRound = async (
@@ -228,10 +219,6 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
     playerName: string
   ) => {
     if (!round) return;
-    if (!isAdmin) {
-      showToast("Admin access required to remove scores.", "error");
-      return;
-    }
     const confirmed = window.confirm(
       `Clear all scores for ${playerName} in this round?`
     );
@@ -256,51 +243,13 @@ export default function ScoreEntryClient({ roundId }: { roundId: string }) {
     showToast("Scores cleared for player.", "ok");
   };
 
-  if (loading || authLoading) {
+  if (loading) {
     return (
       <main className="mx-auto flex w-full max-w-2xl flex-col px-4 py-8">
         <div className="rounded-3xl bg-white p-6 shadow-sm">
           Loading round...
         </div>
       </main>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <AdminShell
-        title="Admin sign-in required"
-        subtitle={EVENT_NAME}
-        description="You must be logged in to enter scores."
-      >
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <Link
-            className="inline-flex h-11 items-center justify-center rounded-2xl bg-pine-600 px-4 text-sm font-semibold text-white"
-            href="/login"
-          >
-            Go to Login
-          </Link>
-        </section>
-      </AdminShell>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <AdminShell
-        title="Admin access required"
-        subtitle={event?.name ?? EVENT_NAME}
-        description="You are logged in but not listed as an admin for this event."
-      >
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <Link
-            className="inline-flex h-11 items-center justify-center rounded-2xl bg-pine-600 px-4 text-sm font-semibold text-white"
-            href="/admin"
-          >
-            Go to Admin Dashboard
-          </Link>
-        </section>
-      </AdminShell>
     );
   }
 

@@ -5,14 +5,11 @@ import Link from "next/link";
 import AdminShell from "@/app/components/AdminShell";
 import { EVENT_NAME, EVENT_SLUG } from "@/lib/event";
 import { supabase } from "@/lib/supabaseClient";
-import { useAdminStatus } from "@/lib/useAdminStatus";
 
-const emptyRound = {
-  round_number: 1,
-  course: "",
-  date: "",
-  par: 72,
-  entry_pin: ""
+const emptyPlayerForm = {
+  name: "",
+  handicap: 0,
+  starting_score: 0
 };
 
 type EventRow = {
@@ -27,7 +24,6 @@ type RoundRow = {
   course: string | null;
   date: string | null;
   par: number;
-  entry_pin: string | null;
 };
 
 type PlayerRow = {
@@ -37,37 +33,15 @@ type PlayerRow = {
   starting_score: number;
 };
 
-type AdminRow = {
-  user_id: string;
-  role: string;
-  email: string;
-};
-
 export default function AdminClient() {
   const [event, setEvent] = useState<EventRow | null>(null);
   const [rounds, setRounds] = useState<RoundRow[]>([]);
   const [players, setPlayers] = useState<PlayerRow[]>([]);
-  const [admins, setAdmins] = useState<AdminRow[]>([]);
-  const [roundForm, setRoundForm] = useState(emptyRound);
-  const [roundLoading, setRoundLoading] = useState(false);
-  const [playerName, setPlayerName] = useState("");
-  const [playerHandicap, setPlayerHandicap] = useState(0);
-  const [playerStartingScore, setPlayerStartingScore] = useState(0);
+  const [playerForm, setPlayerForm] = useState(emptyPlayerForm);
+  const [loading, setLoading] = useState(true);
   const [playerLoading, setPlayerLoading] = useState(false);
   const [eventLoading, setEventLoading] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("admin");
-  const [inviteLoading, setInviteLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
-  const [editPlayerName, setEditPlayerName] = useState("");
-  const [editPlayerHandicap, setEditPlayerHandicap] = useState(0);
-  const [editPlayerStartingScore, setEditPlayerStartingScore] = useState(0);
-
-  const { isAdmin, isAuthenticated, loading: authLoading } = useAdminStatus(
-    event?.id
-  );
 
   const showToast = (message: string) => {
     setToast(message);
@@ -87,7 +61,6 @@ export default function AdminClient() {
     if (!eventData) {
       setRounds([]);
       setPlayers([]);
-      setAdmins([]);
       setLoading(false);
       return;
     }
@@ -95,9 +68,7 @@ export default function AdminClient() {
     const [roundsRes, playersRes] = await Promise.all([
       supabase
         .from("rounds")
-        .select(
-          "id,round_number,course,date,par,entry_pin"
-        )
+        .select("id,round_number,course,date,par")
         .eq("event_id", eventData.id)
         .order("round_number", { ascending: true }),
       supabase
@@ -107,35 +78,14 @@ export default function AdminClient() {
         .order("name", { ascending: true })
     ]);
 
-    const roundRows = (roundsRes.data ?? []) as RoundRow[];
-    const playerRows = (playersRes.data ?? []) as PlayerRow[];
-
-    setRounds(roundRows);
-    setPlayers(playerRows);
+    setRounds((roundsRes.data ?? []) as RoundRow[]);
+    setPlayers((playersRes.data ?? []) as PlayerRow[]);
     setLoading(false);
   }, []);
 
   useEffect(() => {
     void loadEventData();
   }, [loadEventData]);
-
-  const loadAdmins = useCallback(async () => {
-    if (!event) return;
-    const response = await fetch(`/api/admins/list?eventId=${event.id}`);
-    if (!response.ok) {
-      showToast("Failed to load admin list.");
-      return;
-    }
-    const data = (await response.json()) as { admins?: AdminRow[] };
-    setAdmins(data.admins ?? []);
-  }, [event]);
-
-  useEffect(() => {
-    if (event && isAdmin) {
-      void loadAdmins();
-    }
-  }, [event, isAdmin, loadAdmins]);
-
 
   const handleCreateEvent = async () => {
     setEventLoading(true);
@@ -144,10 +94,7 @@ export default function AdminClient() {
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        name: EVENT_NAME,
-        slug: EVENT_SLUG
-      })
+      body: JSON.stringify({ name: EVENT_NAME, slug: EVENT_SLUG })
     });
 
     if (!response.ok) {
@@ -161,121 +108,41 @@ export default function AdminClient() {
     void loadEventData();
   };
 
-  const handleCreateRound = async () => {
-    if (!event) {
-      showToast("Create the event first.");
-      return;
-    }
-    setRoundLoading(true);
-    const { data, error } = await supabase
-      .from("rounds")
-      .insert({
-        event_id: event.id,
-        round_number: roundForm.round_number,
-        course: roundForm.course,
-        date: roundForm.date || null,
-        par: roundForm.par,
-        entry_pin: roundForm.entry_pin || null
-      })
-      .select()
-      .single();
-
-    if (error) {
-      showToast("Failed to create round.");
-      setRoundLoading(false);
-      return;
-    }
-
-    setRounds((prev) => [...prev, data]);
-    setRoundForm(emptyRound);
-    showToast("Round created.");
-    setRoundLoading(false);
-  };
-
   const handleAddPlayer = async () => {
     if (!event) {
       showToast("Create the event first.");
       return;
     }
-    if (!playerName.trim()) {
+    if (!playerForm.name.trim()) {
       showToast("Enter a player name.");
       return;
     }
+
     setPlayerLoading(true);
     const { data, error } = await supabase
       .from("players")
       .insert({
         event_id: event.id,
-        name: playerName,
-        handicap: playerHandicap,
-        starting_score: playerStartingScore
+        name: playerForm.name.trim(),
+        handicap: playerForm.handicap,
+        starting_score: playerForm.starting_score
       })
       .select()
       .single();
 
-    if (error) {
+    if (error || !data) {
       showToast("Failed to add player.");
       setPlayerLoading(false);
       return;
     }
 
     setPlayers((prev) => [...prev, data]);
-    setPlayerName("");
-    setPlayerHandicap(0);
-    setPlayerStartingScore(0);
+    setPlayerForm(emptyPlayerForm);
     showToast("Player added.");
     setPlayerLoading(false);
   };
 
-  const handleEditPlayer = (player: PlayerRow) => {
-    setEditingPlayerId(player.id);
-    setEditPlayerName(player.name);
-    setEditPlayerHandicap(player.handicap);
-    setEditPlayerStartingScore(player.starting_score);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingPlayerId(null);
-  };
-
-  const handleUpdatePlayer = async (playerId: string) => {
-    if (!isAdmin) {
-      showToast("Admin access required to edit players.");
-      return;
-    }
-    if (!editPlayerName.trim()) {
-      showToast("Enter a player name.");
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("players")
-      .update({
-        name: editPlayerName.trim(),
-        handicap: editPlayerHandicap,
-        starting_score: editPlayerStartingScore
-      })
-      .eq("id", playerId)
-      .select()
-      .single();
-
-    if (error || !data) {
-      showToast("Failed to update player.");
-      return;
-    }
-
-    setPlayers((prev) =>
-      prev.map((player) => (player.id === playerId ? data : player))
-    );
-    setEditingPlayerId(null);
-    showToast("Player updated.");
-  };
-
   const handleDeletePlayer = async (playerId: string, playerName: string) => {
-    if (!isAdmin) {
-      showToast("Admin access required to delete players.");
-      return;
-    }
     const confirmed = window.confirm(
       `Delete player ${playerName}? This will also remove all of their scores.`
     );
@@ -292,43 +159,17 @@ export default function AdminClient() {
     showToast("Player deleted.");
   };
 
-  const handleInviteAdmin = async () => {
-    if (!event) return;
-    if (!inviteEmail.trim()) {
-      showToast("Enter an email address.");
-      return;
-    }
-    setInviteLoading(true);
-    const response = await fetch("/api/admins/invite", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        eventId: event.id,
-        email: inviteEmail.trim(),
-        role: inviteRole
-      })
-    });
-
-    if (!response.ok) {
-      showToast("Failed to invite admin.");
-      setInviteLoading(false);
-      return;
-    }
-
-    showToast("Admin invited.");
-    setInviteEmail("");
-    setInviteLoading(false);
-    void loadAdmins();
+  const handleLogout = async () => {
+    await fetch("/api/admin/logout", { method: "POST" });
+    window.location.href = "/admin-login";
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    window.location.href = "/login";
+  const formatDate = (value: string | null) => {
+    if (!value) return "TBD";
+    return new Date(value).toLocaleDateString();
   };
 
-  if (loading || authLoading) {
+  if (loading) {
     return (
       <main className="mx-auto flex w-full max-w-2xl flex-col px-4 py-8">
         <div className="rounded-3xl bg-white p-6 shadow-sm">Loading...</div>
@@ -336,66 +177,21 @@ export default function AdminClient() {
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <AdminShell
-        title="Admin sign-in required"
-        subtitle={EVENT_NAME}
-        description="You must be logged in to access the admin dashboard."
-      >
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <Link
-            className="inline-flex h-11 items-center justify-center rounded-2xl bg-pine-600 px-4 text-sm font-semibold text-white"
-            href="/login"
-          >
-            Go to Login
-          </Link>
-        </section>
-      </AdminShell>
-    );
-  }
-
-  if (event && !isAdmin) {
-    return (
-      <AdminShell
-        title="You do not have admin access"
-        subtitle={EVENT_NAME}
-        description="You are logged in, but not listed as an admin for this event."
-        actions={
-          <button
-            className="h-10 rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-700"
-            onClick={handleSignOut}
-            type="button"
-          >
-            Sign out
-          </button>
-        }
-      >
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-600">
-            Ask an existing admin to add you to the event admin list.
-          </p>
-        </section>
-      </AdminShell>
-    );
-  }
-
   return (
     <AdminShell
-      title="Admin Dashboard"
-      subtitle={EVENT_NAME}
-      description="Manage rounds, players, and admin access."
+      title="Myrtle Beach Classic 2026 – Admin"
+      subtitle="Admin Portal"
+      description="Manage players, rounds, and score entry."
       actions={
         <button
           className="h-10 rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-700"
-          onClick={handleSignOut}
+          onClick={handleLogout}
           type="button"
         >
-          Sign out
+          Log out
         </button>
       }
     >
-
       {toast && (
         <div className="rounded-2xl bg-pine-50 px-4 py-3 text-sm font-semibold text-pine-700">
           {toast}
@@ -421,304 +217,90 @@ export default function AdminClient() {
 
       {event && (
         <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">
-                Event Summary
-              </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                {event.name} • {event.slug}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-              <span>{rounds.length}/5 rounds created</span>
-            </div>
+          <h2 className="text-lg font-semibold text-slate-900">
+            Players Management
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Add or remove players for the event.
+          </p>
+
+          <div className="mt-4 grid gap-4">
+            <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
+              Name
+              <input
+                className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
+                value={playerForm.name}
+                onChange={(eventItem) =>
+                  setPlayerForm((prev) => ({
+                    ...prev,
+                    name: eventItem.target.value
+                  }))
+                }
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
+              Handicap
+              <input
+                className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
+                max={36}
+                min={0}
+                type="number"
+                value={playerForm.handicap}
+                onChange={(eventItem) =>
+                  setPlayerForm((prev) => ({
+                    ...prev,
+                    handicap: Math.max(
+                      0,
+                      Math.min(36, Number(eventItem.target.value))
+                    )
+                  }))
+                }
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
+              Starting Score
+              <input
+                className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
+                type="number"
+                value={playerForm.starting_score}
+                onChange={(eventItem) =>
+                  setPlayerForm((prev) => ({
+                    ...prev,
+                    starting_score: Number(eventItem.target.value)
+                  }))
+                }
+              />
+            </label>
+            <button
+              className="h-12 rounded-2xl bg-pine-600 text-base font-semibold text-white shadow-lg shadow-pine-200/60 disabled:opacity-60"
+              disabled={playerLoading}
+              onClick={handleAddPlayer}
+              type="button"
+            >
+              {playerLoading ? "Adding..." : "Add Player"}
+            </button>
           </div>
 
-          <div className="mt-4 grid gap-3">
-            {rounds.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500">
-                No rounds yet. Add rounds 1–5 below.
-              </div>
-            )}
-            {rounds.map((item) => (
-              <div
-                key={item.id}
-                className="flex flex-col gap-3 rounded-2xl border border-slate-100 px-4 py-3 text-sm"
-              >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-base font-semibold text-slate-900">
-                      Round {item.round_number}
-                    </p>
-                    {(item.course || item.date) && (
-                      <p className="text-xs text-slate-500">
-                        {[item.course, item.date].filter(Boolean).join(" • ")}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link
-                      className="inline-flex h-9 items-center justify-center rounded-xl border border-pine-200 px-3 text-xs font-semibold text-pine-700"
-                      href={`/r/${item.id}`}
-                    >
-                      Leaderboard
-                    </Link>
-                    <Link
-                      className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-700"
-                      href={`/r/${item.id}/enter`}
-                    >
-                      Enter Scores
-                    </Link>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-                  <span>Par {item.par}</span>
-                  <span>PIN {item.entry_pin ? "enabled" : "open"}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-6 grid gap-4 border-t border-slate-100 pt-6">
-            <h3 className="text-sm font-semibold text-slate-900">
-              Add a round
-            </h3>
-            <div className="grid gap-4">
-              <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
-                Round Number
-                <select
-                  className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
-                  value={roundForm.round_number}
-                  onChange={(eventItem) =>
-                    setRoundForm((prev) => ({
-                      ...prev,
-                      round_number: Number(eventItem.target.value)
-                    }))
-                  }
-                >
-                  {[1, 2, 3, 4, 5].map((number) => (
-                    <option key={number} value={number}>
-                      Round {number}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
-                Course
-                <input
-                  className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
-                  value={roundForm.course}
-                  onChange={(eventItem) =>
-                    setRoundForm((prev) => ({
-                      ...prev,
-                      course: eventItem.target.value
-                    }))
-                  }
-                />
-              </label>
-              <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
-                Date
-                <input
-                  className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
-                  type="date"
-                  value={roundForm.date}
-                  onChange={(eventItem) =>
-                    setRoundForm((prev) => ({
-                      ...prev,
-                      date: eventItem.target.value
-                    }))
-                  }
-                />
-              </label>
-              <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
-                Par
-                <input
-                  className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
-                  type="number"
-                  min={60}
-                  max={80}
-                  value={roundForm.par}
-                  onChange={(eventItem) =>
-                    setRoundForm((prev) => ({
-                      ...prev,
-                      par: Number(eventItem.target.value)
-                    }))
-                  }
-                />
-              </label>
-              <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
-                Entry PIN
-                <input
-                  className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
-                  placeholder="Optional PIN"
-                  value={roundForm.entry_pin}
-                  onChange={(eventItem) =>
-                    setRoundForm((prev) => ({
-                      ...prev,
-                      entry_pin: eventItem.target.value
-                    }))
-                  }
-                />
-              </label>
-              <button
-                className="h-12 rounded-2xl bg-pine-600 text-base font-semibold text-white shadow-lg shadow-pine-200/60 disabled:opacity-60"
-                disabled={roundLoading || !event}
-                onClick={handleCreateRound}
-                type="button"
-              >
-                {roundLoading ? "Creating..." : "Create Round"}
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
-
-      <section className="rounded-3xl bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">
-          Players Management
-        </h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Add, edit, or remove players for the event.
-        </p>
-        <div className="mt-4 grid gap-4">
-          <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
-            Player Name
-            <input
-              className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
-              value={playerName}
-              onChange={(eventItem) => setPlayerName(eventItem.target.value)}
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
-            Handicap (0-36)
-            <input
-              className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
-              max={36}
-              min={0}
-              type="number"
-              value={playerHandicap}
-              onChange={(eventItem) =>
-                setPlayerHandicap(
-                  Math.max(0, Math.min(36, Number(eventItem.target.value)))
-                )
-              }
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
-            Starting Score
-            <input
-              className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
-              type="number"
-              value={playerStartingScore}
-              onChange={(eventItem) =>
-                setPlayerStartingScore(Number(eventItem.target.value))
-              }
-            />
-          </label>
-          <button
-            className="h-12 rounded-2xl bg-pine-600 text-base font-semibold text-white shadow-lg shadow-pine-200/60 disabled:opacity-60"
-            disabled={playerLoading || !event}
-            onClick={handleAddPlayer}
-            type="button"
-          >
-            {playerLoading ? "Adding..." : "Add Player"}
-          </button>
-        </div>
-
-        {players.length > 0 && (
-          <div className="mt-4 grid gap-2">
-            {players.map((player) => {
-              const isEditing = editingPlayerId === player.id;
-              return (
-                <div
-                  key={player.id}
-                  className="flex flex-col gap-3 rounded-2xl border border-slate-100 px-4 py-3 text-sm"
-                >
-                  {isEditing ? (
-                    <div className="grid gap-3">
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <label className="flex flex-col gap-2 text-xs font-semibold text-slate-500">
-                          Name
-                          <input
-                            className="h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-900 focus:border-pine-500 focus:outline-none"
-                            value={editPlayerName}
-                            onChange={(eventItem) =>
-                              setEditPlayerName(eventItem.target.value)
-                            }
-                          />
-                        </label>
-                        <label className="flex flex-col gap-2 text-xs font-semibold text-slate-500">
-                          Handicap
-                          <input
-                            className="h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-900 focus:border-pine-500 focus:outline-none"
-                            max={36}
-                            min={0}
-                            type="number"
-                            value={editPlayerHandicap}
-                            onChange={(eventItem) =>
-                              setEditPlayerHandicap(
-                                Math.max(
-                                  0,
-                                  Math.min(
-                                    36,
-                                    Number(eventItem.target.value)
-                                  )
-                                )
-                              )
-                            }
-                          />
-                        </label>
-                        <label className="flex flex-col gap-2 text-xs font-semibold text-slate-500">
-                          Starting Score
-                          <input
-                            className="h-10 rounded-xl border border-slate-200 px-3 text-sm text-slate-900 focus:border-pine-500 focus:outline-none"
-                            type="number"
-                            value={editPlayerStartingScore}
-                            onChange={(eventItem) =>
-                              setEditPlayerStartingScore(
-                                Number(eventItem.target.value)
-                              )
-                            }
-                          />
-                        </label>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          className="inline-flex h-9 items-center justify-center rounded-xl bg-pine-600 px-3 text-xs font-semibold text-white"
-                          onClick={() => handleUpdatePlayer(player.id)}
-                          type="button"
-                        >
-                          Save
-                        </button>
-                        <button
-                          className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-700"
-                          onClick={handleCancelEdit}
-                          type="button"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <span className="font-semibold text-slate-900">
-                          {player.name}
-                        </span>
-                        <p className="text-xs text-slate-500">
-                          Handicap {player.handicap} • Start{" "}
-                          {player.starting_score}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-700"
-                          onClick={() => handleEditPlayer(player)}
-                          type="button"
-                        >
-                          Edit
-                        </button>
+          {players.length > 0 ? (
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full min-w-[520px] text-left text-sm text-slate-700">
+                <thead>
+                  <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="py-3 pr-3">Name</th>
+                    <th className="py-3 pr-3">Handicap</th>
+                    <th className="py-3 pr-3">Starting</th>
+                    <th className="py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {players.map((player) => (
+                    <tr key={player.id} className="border-b border-slate-100">
+                      <td className="py-3 pr-3 font-semibold text-slate-900">
+                        {player.name}
+                      </td>
+                      <td className="py-3 pr-3">{player.handicap}</td>
+                      <td className="py-3 pr-3">{player.starting_score}</td>
+                      <td className="py-3 text-right">
                         <button
                           className="inline-flex h-9 items-center justify-center rounded-xl border border-red-200 px-3 text-xs font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-50"
                           onClick={() =>
@@ -728,79 +310,77 @@ export default function AdminClient() {
                         >
                           Delete
                         </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-slate-500">
+              No players yet. Add players above.
+            </p>
+          )}
+        </section>
+      )}
 
-      <section className="rounded-3xl bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">
-          Admins Overview
-        </h2>
-        <p className="mt-2 text-sm text-slate-600">
-          Current admins for the event (email + role).
-        </p>
-
-        {admins.length > 0 ? (
-          <div className="mt-4 grid gap-2">
-            {admins.map((admin) => (
-              <div
-                key={admin.user_id}
-                className="flex flex-col gap-1 rounded-2xl border border-slate-100 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
-              >
-                <span className="font-semibold text-slate-900">
-                  {admin.email || admin.user_id}
-                </span>
-                <span className="text-slate-500">{admin.role}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-4 text-sm text-slate-500">
-            No admins found for this event yet.
+      {event && (
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">
+            Rounds Overview
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Quick links for each round.
           </p>
-        )}
-
-        <div className="mt-6 grid gap-4 border-t border-slate-100 pt-6">
-          <p className="text-sm font-semibold text-slate-900">
-            Invite additional admins (optional)
-          </p>
-          <div className="grid gap-4">
-            <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
-              Admin Email
-              <input
-                className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
-                value={inviteEmail}
-                onChange={(eventItem) => setInviteEmail(eventItem.target.value)}
-              />
-            </label>
-            <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
-              Role
-              <select
-                className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
-                value={inviteRole}
-                onChange={(eventItem) => setInviteRole(eventItem.target.value)}
-              >
-                <option value="admin">Admin</option>
-                <option value="owner">Owner</option>
-              </select>
-            </label>
-            <button
-              className="h-12 rounded-2xl bg-pine-600 text-base font-semibold text-white shadow-lg shadow-pine-200/60 disabled:opacity-60"
-              disabled={inviteLoading || !event}
-              onClick={handleInviteAdmin}
-              type="button"
-            >
-              {inviteLoading ? "Sending..." : "Invite Admin"}
-            </button>
-          </div>
-        </div>
-      </section>
+          {rounds.length > 0 ? (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[640px] text-left text-sm text-slate-700">
+                <thead>
+                  <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="py-3 pr-3">Round</th>
+                    <th className="py-3 pr-3">Course</th>
+                    <th className="py-3 pr-3">Date</th>
+                    <th className="py-3 pr-3">Par</th>
+                    <th className="py-3 text-right">Links</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rounds.map((round) => (
+                    <tr key={round.id} className="border-b border-slate-100">
+                      <td className="py-3 pr-3 font-semibold text-slate-900">
+                        Round {round.round_number}
+                      </td>
+                      <td className="py-3 pr-3">{round.course ?? "TBD"}</td>
+                      <td className="py-3 pr-3">{formatDate(round.date)}</td>
+                      <td className="py-3 pr-3">{round.par}</td>
+                      <td className="py-3 text-right">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <Link
+                            className="inline-flex h-9 items-center justify-center rounded-xl border border-pine-200 px-3 text-xs font-semibold text-pine-700"
+                            href={`/r/${round.id}`}
+                          >
+                            Leaderboard
+                          </Link>
+                          <Link
+                            className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-700"
+                            href={`/r/${round.id}/enter`}
+                          >
+                            Enter Scores
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-slate-500">
+              No rounds yet. Add rounds in Supabase to activate leaderboards.
+            </p>
+          )}
+        </section>
+      )}
     </AdminShell>
   );
 }
