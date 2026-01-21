@@ -8,6 +8,8 @@ type AdminShellProps = {
   subtitle?: string;
   description?: string;
   actions?: ReactNode;
+  backLinkLabel?: string;
+  backLinkHref?: string;
   children: ReactNode;
 };
 
@@ -16,6 +18,8 @@ export default function AdminShell({
   subtitle,
   description,
   actions,
+  backLinkLabel = "Back to site",
+  backLinkHref = "/",
   children
 }: AdminShellProps) {
   return (
@@ -35,10 +39,10 @@ export default function AdminShell({
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Link
-              className="inline-flex h-10 items-center justify-center rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-700"
-              href="/"
+              className="inline-flex h-9 items-center justify-center rounded-2xl border border-slate-200 px-3 text-xs font-semibold text-slate-700"
+              href={backLinkHref}
             >
-              Back to Home
+              {backLinkLabel}
             </Link>
             {actions}
           </div>
