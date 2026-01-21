@@ -5,7 +5,6 @@ import Link from "next/link";
 import AdminShell from "@/app/components/AdminShell";
 import { EVENT_NAME, EVENT_SLUG } from "@/lib/event";
 import { supabase } from "@/lib/supabaseClient";
-import { useAdminStatus } from "@/lib/useAdminStatus";
 
 const emptyRound = {
   round_number: 1,
@@ -55,19 +54,12 @@ export default function AdminClient() {
   const [playerStartingScore, setPlayerStartingScore] = useState(0);
   const [playerLoading, setPlayerLoading] = useState(false);
   const [eventLoading, setEventLoading] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("admin");
-  const [inviteLoading, setInviteLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
   const [editPlayerName, setEditPlayerName] = useState("");
   const [editPlayerHandicap, setEditPlayerHandicap] = useState(0);
   const [editPlayerStartingScore, setEditPlayerStartingScore] = useState(0);
-
-  const { isAdmin, isAuthenticated, loading: authLoading } = useAdminStatus(
-    event?.id
-  );
 
   const showToast = (message: string) => {
     setToast(message);
@@ -131,11 +123,10 @@ export default function AdminClient() {
   }, [event]);
 
   useEffect(() => {
-    if (event && isAdmin) {
+    if (event) {
       void loadAdmins();
     }
-  }, [event, isAdmin, loadAdmins]);
-
+  }, [event, loadAdmins]);
 
   const handleCreateEvent = async () => {
     setEventLoading(true);
@@ -239,10 +230,6 @@ export default function AdminClient() {
   };
 
   const handleUpdatePlayer = async (playerId: string) => {
-    if (!isAdmin) {
-      showToast("Admin access required to edit players.");
-      return;
-    }
     if (!editPlayerName.trim()) {
       showToast("Enter a player name.");
       return;
@@ -272,10 +259,6 @@ export default function AdminClient() {
   };
 
   const handleDeletePlayer = async (playerId: string, playerName: string) => {
-    if (!isAdmin) {
-      showToast("Admin access required to delete players.");
-      return;
-    }
     const confirmed = window.confirm(
       `Delete player ${playerName}? This will also remove all of their scores.`
     );
@@ -292,91 +275,16 @@ export default function AdminClient() {
     showToast("Player deleted.");
   };
 
-  const handleInviteAdmin = async () => {
-    if (!event) return;
-    if (!inviteEmail.trim()) {
-      showToast("Enter an email address.");
-      return;
-    }
-    setInviteLoading(true);
-    const response = await fetch("/api/admins/invite", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        eventId: event.id,
-        email: inviteEmail.trim(),
-        role: inviteRole
-      })
-    });
-
-    if (!response.ok) {
-      showToast("Failed to invite admin.");
-      setInviteLoading(false);
-      return;
-    }
-
-    showToast("Admin invited.");
-    setInviteEmail("");
-    setInviteLoading(false);
-    void loadAdmins();
-  };
-
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    window.location.href = "/login";
+    await fetch("/api/admin/logout", { method: "POST" });
+    window.location.href = "/admin-login";
   };
 
-  if (loading || authLoading) {
+  if (loading) {
     return (
       <main className="mx-auto flex w-full max-w-2xl flex-col px-4 py-8">
         <div className="rounded-3xl bg-white p-6 shadow-sm">Loading...</div>
       </main>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <AdminShell
-        title="Admin sign-in required"
-        subtitle={EVENT_NAME}
-        description="You must be logged in to access the admin dashboard."
-      >
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <Link
-            className="inline-flex h-11 items-center justify-center rounded-2xl bg-pine-600 px-4 text-sm font-semibold text-white"
-            href="/login"
-          >
-            Go to Login
-          </Link>
-        </section>
-      </AdminShell>
-    );
-  }
-
-  if (event && !isAdmin) {
-    return (
-      <AdminShell
-        title="You do not have admin access"
-        subtitle={EVENT_NAME}
-        description="You are logged in, but not listed as an admin for this event."
-        actions={
-          <button
-            className="h-10 rounded-2xl border border-slate-200 px-4 text-sm font-semibold text-slate-700"
-            onClick={handleSignOut}
-            type="button"
-          >
-            Sign out
-          </button>
-        }
-      >
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-600">
-            Ask an existing admin to add you to the event admin list.
-          </p>
-        </section>
-      </AdminShell>
     );
   }
 
@@ -766,39 +674,13 @@ export default function AdminClient() {
           </p>
         )}
 
-        <div className="mt-6 grid gap-4 border-t border-slate-100 pt-6">
+        <div className="mt-6 border-t border-slate-100 pt-6">
           <p className="text-sm font-semibold text-slate-900">
-            Invite additional admins (optional)
+            Admin invites are disabled.
           </p>
-          <div className="grid gap-4">
-            <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
-              Admin Email
-              <input
-                className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
-                value={inviteEmail}
-                onChange={(eventItem) => setInviteEmail(eventItem.target.value)}
-              />
-            </label>
-            <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
-              Role
-              <select
-                className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
-                value={inviteRole}
-                onChange={(eventItem) => setInviteRole(eventItem.target.value)}
-              >
-                <option value="admin">Admin</option>
-                <option value="owner">Owner</option>
-              </select>
-            </label>
-            <button
-              className="h-12 rounded-2xl bg-pine-600 text-base font-semibold text-white shadow-lg shadow-pine-200/60 disabled:opacity-60"
-              disabled={inviteLoading || !event}
-              onClick={handleInviteAdmin}
-              type="button"
-            >
-              {inviteLoading ? "Sending..." : "Invite Admin"}
-            </button>
-          </div>
+          <p className="mt-2 text-sm text-slate-600">
+            Use the shared admin password to grant access.
+          </p>
         </div>
       </section>
     </AdminShell>

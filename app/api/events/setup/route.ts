@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabaseServer";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { cookies } from "next/headers";
+import { hasAdminCookie } from "@/lib/adminAuth";
 
 export async function POST(request: Request) {
-  const supabase = createSupabaseServerClient();
   const supabaseAdmin = getSupabaseAdmin();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!hasAdminCookie(cookies())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -44,24 +40,6 @@ export async function POST(request: Request) {
     }
 
     eventId = createdEvent.id;
-  }
-
-  if (!existingEvent) {
-    await supabaseAdmin.from("event_admins").upsert({
-      event_id: eventId,
-      user_id: user.id,
-      role: "owner"
-    });
-  } else {
-    const { data: adminRow } = await supabaseAdmin
-      .from("event_admins")
-      .select("user_id")
-      .eq("event_id", eventId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (!adminRow) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
   }
 
   return NextResponse.json({ eventId });
