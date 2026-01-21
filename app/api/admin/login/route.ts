@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import {
   ADMIN_COOKIE_NAME,
-  ADMIN_COOKIE_VALUE,
-  adminCookieOptions
+  adminCookieOptions,
+  createAdminCookieValue
 } from "@/lib/adminAuth";
 
 export async function POST(request: Request) {
@@ -26,10 +26,17 @@ export async function POST(request: Request) {
     return NextResponse.redirect(url);
   }
 
+  const adminCookieValue = createAdminCookieValue();
+  if (!adminCookieValue) {
+    return NextResponse.redirect(
+      new URL("/admin-login?error=missing", request.url)
+    );
+  }
+
   const response = NextResponse.redirect(new URL(redirectTo, request.url));
   response.cookies.set({
     name: ADMIN_COOKIE_NAME,
-    value: ADMIN_COOKIE_VALUE,
+    value: adminCookieValue,
     ...adminCookieOptions
   });
 
