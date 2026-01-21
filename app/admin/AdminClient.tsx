@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import AdminShell from "@/app/components/AdminShell";
 import { EVENT_NAME, EVENT_SLUG } from "@/lib/event";
 import { supabase } from "@/lib/supabaseClient";
