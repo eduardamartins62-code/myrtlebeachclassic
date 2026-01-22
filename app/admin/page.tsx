@@ -56,11 +56,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   if (!event) {
     const { data: slugEvent } = await supabaseAdmin
       .from("events")
-      .select("*")
+      .select("id, name, slug, created_at")
       .eq("slug", EVENT_SLUG)
       .maybeSingle();
-    const slugEventRow: EventRow | null = slugEvent ?? null;
-    event = slugEventRow;
+
+    event = (slugEvent as EventRow | null) ?? null;
   }
 
   if (!event && events.length > 0) {
