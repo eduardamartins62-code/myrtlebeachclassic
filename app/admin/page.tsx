@@ -2,11 +2,28 @@ import AdminClient from "./AdminClient";
 import { EVENT_SLUG } from "@/lib/event";
 import { requireSuperAdmin } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import type { Database } from "@/types/supabase";
 
-type EventRow = Database["public"]["Tables"]["events"]["Row"];
-type RoundRow = Database["public"]["Tables"]["rounds"]["Row"];
-type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
+type EventRow = {
+  id: string;
+  name: string;
+  slug: string;
+  created_at: string;
+};
+
+type RoundRow = {
+  id: string;
+  round_number: number;
+  course: string | null;
+  date: string | null;
+  par: number;
+};
+
+type PlayerRow = {
+  id: string;
+  name: string;
+  handicap: number;
+  starting_score: number;
+};
 
 type AdminPageProps = {
   searchParams?: { eventId?: string };
@@ -21,7 +38,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     .select("*")
     .order("created_at", { ascending: false });
 
-  const events: EventRow[] = eventsData ?? [];
+  const events: EventRow[] = (eventsData ?? []) as EventRow[];
   const eventId = searchParams?.eventId;
 
   let event: EventRow | null = null;
@@ -32,8 +49,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .select("*")
       .eq("id", eventId)
       .maybeSingle();
-    const selectedEventRow: EventRow | null = selectedEvent ?? null;
-    event = selectedEventRow;
+
+    event = (selectedEvent as EventRow | null) ?? null;
   }
 
   if (!event) {
