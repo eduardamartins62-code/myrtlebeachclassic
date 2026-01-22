@@ -59,8 +59,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .select("*")
       .eq("slug", EVENT_SLUG)
       .maybeSingle();
-    const slugEventRow: EventRow | null = slugEvent ?? null;
-    event = slugEventRow;
+    event = (slugEvent as EventRow | null) ?? null;
   }
 
   if (!event && events.length > 0) {
