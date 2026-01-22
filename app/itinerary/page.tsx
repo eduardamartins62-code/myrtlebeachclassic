@@ -6,8 +6,18 @@ import type { Database } from "@/types/supabase";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 type RoundRow = Database["public"]["Tables"]["rounds"]["Row"];
-type ItineraryItem =
-  Database["public"]["Tables"]["itinerary_items"]["Row"];
+type ItineraryItem = {
+  id: string;
+  category: string;
+  title: string;
+  description: string | null;
+  address: string | null;
+  website_url: string | null;
+  day_label: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  sort_order: number | null;
+};
 
 type GroupedDay = {
   label: string;
@@ -57,7 +67,7 @@ export default async function ItineraryPage() {
     .order("day_label", { ascending: true })
     .order("sort_order", { ascending: true });
 
-  const items = itineraryItems ?? [];
+  const items: ItineraryItem[] = itineraryItems ?? [];
   const eventName = (event as EventRow | null)?.name ?? EVENT_NAME;
   const dateRange = formatDateRange((rounds ?? []) as RoundRow[]);
   const primaryHotel = items.find((item) => item.category === "HOTEL");
