@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/supabase";
 
 export function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -8,7 +9,7 @@ export function getSupabaseAdmin() {
     throw new Error("Supabase admin environment variables are missing.");
   }
 
-  return createClient(url, key, {
+  return createClient<Database>(url, key, {
     auth: {
       persistSession: false
     }
