@@ -33,12 +33,24 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   await requireSuperAdmin();
   const supabaseAdmin = getSupabaseAdmin();
 
+  const toEventRow = (row: {
+    id: string;
+    name: string;
+    slug: string;
+    created_at: string;
+  }): EventRow => ({
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    created_at: row.created_at
+  });
+
   const { data: eventsData } = await supabaseAdmin
     .from("events")
-    .select("*")
+    .select("id,name,slug,created_at")
     .order("created_at", { ascending: false });
 
-  const events: EventRow[] = (eventsData ?? []) as EventRow[];
+  const events: EventRow[] = (eventsData ?? []).map(toEventRow);
   const eventId = searchParams?.eventId;
 
   let event: EventRow | null = null;
@@ -46,21 +58,21 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   if (eventId) {
     const { data: selectedEvent } = await supabaseAdmin
       .from("events")
-      .select("*")
+      .select("id,name,slug,created_at")
       .eq("id", eventId)
       .maybeSingle();
 
-    event = (selectedEvent as EventRow | null) ?? null;
+    event = selectedEvent ? toEventRow(selectedEvent) : null;
   }
 
   if (!event) {
     const { data: slugEvent } = await supabaseAdmin
       .from("events")
-      .select("*")
+      .select("id,name,slug,created_at")
       .eq("slug", EVENT_SLUG)
       .maybeSingle();
-    const slugEventRow: EventRow | null = slugEvent ?? null;
-    event = slugEventRow;
+
+    event = slugEvent ? toEventRow(slugEvent) : null;
   }
 
   if (!event && events.length > 0) {
