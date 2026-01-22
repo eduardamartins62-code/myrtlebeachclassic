@@ -1,13 +1,9 @@
 import AdminClient from "./AdminClient";
 import { EVENT_NAME, EVENT_SLUG } from "@/lib/event";
+import type { Database } from "@/lib/database.types";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
-type EventRow = {
-  id: string;
-  name: string;
-  slug: string;
-  created_at: string;
-};
+type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
 type RoundRow = {
   id: string;
@@ -43,31 +39,38 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const supabaseAdmin = getSupabaseAdmin();
 
   const { data: eventsData } = await supabaseAdmin
-    .from("events")
+    .from<EventRow>("events")
     .select("*")
     .order("created_at", { ascending: false });
 
-  const events = (eventsData as EventRow[]) ?? [];
+  const events = eventsData ?? [];
   const eventId = searchParams?.eventId;
 
   let event: EventRow | null = null;
 
   if (eventId) {
-    const { data: selectedEvent } = await supabaseAdmin
-      .from("events")
-      .select("*")
-      .eq("id", eventId)
-      .maybeSingle();
-    event = (selectedEvent as EventRow | null) ?? null;
+    const { data: selectedEvent, error: selectedEventError } =
+      await supabaseAdmin
+        .from<EventRow>("events")
+        .select("*")
+        .eq("id", eventId)
+        .maybeSingle();
+    if (selectedEventError) {
+      console.error("Failed to load selected event", selectedEventError);
+    }
+    event = selectedEvent ?? null;
   }
 
   if (!event) {
-    const { data: slugEvent } = await supabaseAdmin
-      .from("events")
+    const { data: slugEvent, error: slugEventError } = await supabaseAdmin
+      .from<EventRow>("events")
       .select("*")
       .eq("slug", EVENT_SLUG)
       .maybeSingle();
-    event = (slugEvent as EventRow | null) ?? null;
+    if (slugEventError) {
+      console.error("Failed to load slug event", slugEventError);
+    }
+    event = slugEvent ?? null;
   }
 
   if (!event && events.length > 0) {
