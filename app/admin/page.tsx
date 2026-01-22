@@ -5,8 +5,8 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 type EventRow = {
   id: string;
   name: string;
-  slug?: string | null;
-  location?: string | null;
+  slug: string;
+  created_at: string;
 };
 
 type RoundRow = {
@@ -35,46 +35,43 @@ type ItineraryItemRow = {
   sort_order: number | null;
 };
 
-const getLatestEvent = async (supabaseAdmin: ReturnType<typeof getSupabaseAdmin>) => {
-  const latestByCreated = await supabaseAdmin
-    .from("events")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!latestByCreated.error && latestByCreated.data) {
-    return latestByCreated.data as EventRow;
-  }
-
-  const fallback = await supabaseAdmin
-    .from("events")
-    .select("*")
-    .order("id", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  return (fallback.data as EventRow) ?? null;
+type AdminPageProps = {
+  searchParams?: { eventId?: string };
 };
 
-export default async function AdminPage() {
+export default async function AdminPage({ searchParams }: AdminPageProps) {
   const supabaseAdmin = getSupabaseAdmin();
 
-  const { data: slugEvent } = await supabaseAdmin
+  const { data: eventsData } = await supabaseAdmin
     .from("events")
     .select("*")
-    .eq("slug", EVENT_SLUG)
-    .maybeSingle();
+    .order("created_at", { ascending: false });
 
-  let event = (slugEvent as EventRow | null) ?? (await getLatestEvent(supabaseAdmin));
+  const events = (eventsData as EventRow[]) ?? [];
+  const eventId = searchParams?.eventId;
+
+  let event: EventRow | null = null;
+
+  if (eventId) {
+    const { data: selectedEvent } = await supabaseAdmin
+      .from("events")
+      .select("*")
+      .eq("id", eventId)
+      .maybeSingle();
+    event = (selectedEvent as EventRow | null) ?? null;
+  }
 
   if (!event) {
-    const { data: createdEvent } = await supabaseAdmin
+    const { data: slugEvent } = await supabaseAdmin
       .from("events")
-      .insert({ name: EVENT_NAME, slug: EVENT_SLUG })
       .select("*")
-      .single();
-    event = (createdEvent as EventRow | null) ?? null;
+      .eq("slug", EVENT_SLUG)
+      .maybeSingle();
+    event = (slugEvent as EventRow | null) ?? null;
+  }
+
+  if (!event && events.length > 0) {
+    event = events[0];
   }
 
   let players: PlayerRow[] = [];
@@ -116,6 +113,7 @@ export default async function AdminPage() {
   return (
     <AdminClient
       event={event}
+      initialEvents={events}
       initialPlayers={players}
       initialRounds={rounds}
       initialItineraryItems={itineraryItems}

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AdminShell from "@/app/components/AdminShell";
 import { EVENT_NAME } from "@/lib/event";
 import { supabase } from "@/lib/supabaseClient";
@@ -21,11 +22,16 @@ const emptyItineraryForm = {
   url: ""
 };
 
+const emptyEventForm = {
+  name: "",
+  slug: ""
+};
+
 type EventRow = {
   id: string;
   name: string;
-  slug?: string | null;
-  location?: string | null;
+  slug: string;
+  created_at: string;
 };
 
 type RoundRow = {
@@ -56,6 +62,7 @@ type ItineraryItemRow = {
 
 type AdminClientProps = {
   event: EventRow | null;
+  initialEvents: EventRow[];
   initialPlayers: PlayerRow[];
   initialRounds: RoundRow[];
   initialItineraryItems: ItineraryItemRow[];
@@ -73,13 +80,27 @@ const formatDate = (value: string | null) => {
   return new Date(value).toLocaleDateString();
 };
 
+const formatDateTime = (value: string) =>
+  new Date(value).toLocaleDateString();
+
+const toSlug = (value: string) =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+
 export default function AdminClient({
   event,
+  initialEvents,
   initialPlayers,
   initialRounds,
   initialItineraryItems,
   showItinerary
 }: AdminClientProps) {
+  const router = useRouter();
+  const [events, setEvents] = useState<EventRow[]>(initialEvents);
+  const [activeEvent, setActiveEvent] = useState<EventRow | null>(event);
   const [players, setPlayers] = useState<PlayerRow[]>(
     sortPlayers(initialPlayers)
   );
@@ -87,8 +108,10 @@ export default function AdminClient({
   const [itineraryItems, setItineraryItems] = useState<ItineraryItemRow[]>(
     initialItineraryItems
   );
+  const [eventForm, setEventForm] = useState(emptyEventForm);
   const [playerForm, setPlayerForm] = useState(emptyPlayerForm);
   const [itineraryForm, setItineraryForm] = useState(emptyItineraryForm);
+  const [eventLoading, setEventLoading] = useState(false);
   const [playerLoading, setPlayerLoading] = useState(false);
   const [roundsLoading, setRoundsLoading] = useState(false);
   const [itineraryLoading, setItineraryLoading] = useState(false);
@@ -96,7 +119,7 @@ export default function AdminClient({
 
   const playerCount = players.length;
   const roundCount = rounds.length;
-  const eventLocation = event?.location ?? "Myrtle Beach, SC";
+  const eventLocation = "Myrtle Beach, SC";
 
   const groupedItinerary = useMemo(() => {
     if (!showItinerary) return [];
@@ -118,8 +141,55 @@ export default function AdminClient({
     window.setTimeout(() => setToast(null), 3000);
   };
 
+  const handleCreateEvent = async () => {
+    const name = eventForm.name.trim();
+    const slug = eventForm.slug.trim();
+
+    if (!name) {
+      showToast("Enter an event name.");
+      return;
+    }
+
+    if (!slug) {
+      showToast("Enter an event slug.");
+      return;
+    }
+
+    setEventLoading(true);
+    const response = await fetch("/api/events/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, slug })
+    });
+
+    const payload = (await response.json()) as {
+      event?: EventRow;
+      error?: string;
+    };
+
+    if (!response.ok || !payload.event) {
+      showToast(payload.error ?? "Unable to create event.");
+      setEventLoading(false);
+      return;
+    }
+
+    const createdEvent = payload.event;
+    setEvents((prev) => {
+      const next = prev.filter((item) => item.id !== createdEvent.id);
+      return [createdEvent, ...next];
+    });
+    setActiveEvent(createdEvent);
+    setPlayers([]);
+    setRounds([]);
+    setItineraryItems([]);
+    setEventForm(emptyEventForm);
+    showToast("Event created.");
+    router.push(`/admin?eventId=${createdEvent.id}`);
+    setEventLoading(false);
+  };
+
   const handleAddPlayer = async () => {
-    if (!event) {
+    if (!activeEvent) {
       showToast("Event not found.");
       return;
     }
@@ -132,7 +202,7 @@ export default function AdminClient({
     const { data, error } = await supabase
       .from("players")
       .insert({
-        event_id: event.id,
+        event_id: activeEvent.id,
         name: playerForm.name.trim(),
         handicap: playerForm.handicap,
         starting_score: playerForm.starting_score
@@ -170,14 +240,14 @@ export default function AdminClient({
   };
 
   const handleCreateDefaultRounds = async () => {
-    if (!event) {
+    if (!activeEvent) {
       showToast("Event not found.");
       return;
     }
 
     setRoundsLoading(true);
     const defaultRounds = Array.from({ length: 5 }, (_, index) => ({
-      event_id: event.id,
+      event_id: activeEvent.id,
       round_number: index + 1,
       course: `Course ${index + 1}`,
       date: null,
@@ -201,7 +271,7 @@ export default function AdminClient({
   };
 
   const handleAddItineraryItem = async () => {
-    if (!event) {
+    if (!activeEvent) {
       showToast("Event not found.");
       return;
     }
@@ -214,7 +284,7 @@ export default function AdminClient({
     const { data, error } = await supabase
       .from("itinerary_items")
       .insert({
-        event_id: event.id,
+        event_id: activeEvent.id,
         category: itineraryForm.category,
         day: itineraryForm.day.trim() || null,
         name: itineraryForm.name.trim(),
@@ -266,16 +336,6 @@ export default function AdminClient({
     window.location.href = "/admin-login";
   };
 
-  if (!event) {
-    return (
-      <main className="mx-auto flex w-full max-w-2xl flex-col px-4 py-8">
-        <div className="rounded-3xl bg-white p-6 shadow-sm">
-          Unable to load the event. Please check the events table.
-        </div>
-      </main>
-    );
-  }
-
   return (
     <AdminShell
       title="Myrtle Beach Classic 2026 – Admin"
@@ -298,6 +358,122 @@ export default function AdminClient({
       )}
 
       <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Events</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Create new events or select one to manage.
+            </p>
+          </div>
+          <button
+            className="h-9 rounded-2xl border border-slate-200 px-3 text-xs font-semibold text-slate-700"
+            onClick={() =>
+              setEventForm((prev) => ({
+                ...prev,
+                name: "",
+                slug: ""
+              }))
+            }
+            type="button"
+          >
+            Reset form
+          </button>
+        </div>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
+            Event name
+            <input
+              className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
+              value={eventForm.name}
+              onChange={(eventItem) =>
+                setEventForm((prev) => {
+                  const name = eventItem.target.value;
+                  return {
+                    ...prev,
+                    name,
+                    slug: prev.slug ? prev.slug : toSlug(name)
+                  };
+                })
+              }
+            />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
+            Event slug
+            <input
+              className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
+              value={eventForm.slug}
+              onChange={(eventItem) =>
+                setEventForm((prev) => ({
+                  ...prev,
+                  slug: eventItem.target.value
+                }))
+              }
+            />
+          </label>
+        </div>
+        <button
+          className="mt-4 h-12 w-full rounded-2xl bg-pine-600 text-base font-semibold text-white shadow-lg shadow-pine-200/60 disabled:opacity-60 sm:w-auto sm:px-6"
+          disabled={eventLoading}
+          onClick={handleCreateEvent}
+          type="button"
+        >
+          {eventLoading ? "Creating..." : "Create event"}
+        </button>
+
+        {events.length > 0 ? (
+          <div className="mt-6 overflow-x-auto">
+            <table className="w-full min-w-[520px] text-left text-sm text-slate-700">
+              <thead>
+                <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  <th className="py-3 pr-3">Name</th>
+                  <th className="py-3 pr-3">Slug</th>
+                  <th className="py-3 pr-3">Created</th>
+                  <th className="py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((item) => (
+                  <tr key={item.id} className="border-b border-slate-100">
+                    <td className="py-3 pr-3 font-semibold text-slate-900">
+                      {item.name}
+                    </td>
+                    <td className="py-3 pr-3">{item.slug}</td>
+                    <td className="py-3 pr-3">
+                      {formatDateTime(item.created_at)}
+                    </td>
+                    <td className="py-3 text-right">
+                      <Link
+                        className={`inline-flex h-9 items-center justify-center rounded-xl border px-3 text-xs font-semibold ${
+                          activeEvent?.id === item.id
+                            ? "border-pine-300 bg-pine-50 text-pine-700"
+                            : "border-slate-200 text-slate-700"
+                        }`}
+                        href={`/admin?eventId=${item.id}`}
+                      >
+                        {activeEvent?.id === item.id ? "Managing" : "Manage"}
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-slate-500">
+            No events yet. Create your first event above.
+          </p>
+        )}
+      </section>
+
+      {!activeEvent && (
+        <section className="rounded-3xl bg-white p-6 text-sm text-slate-600 shadow-sm">
+          Select an event to manage or create a new event to get started.
+        </section>
+      )}
+
+      {activeEvent && (
+      <section className="rounded-3xl bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">
           Event Snapshot
         </h2>
@@ -310,7 +486,7 @@ export default function AdminClient({
               Name
             </p>
             <p className="mt-2 text-base font-semibold text-slate-900">
-              {event.name ?? EVENT_NAME}
+              {activeEvent.name ?? EVENT_NAME}
             </p>
           </div>
           <div>
@@ -339,7 +515,9 @@ export default function AdminClient({
           </div>
         </div>
       </section>
+      )}
 
+      {activeEvent && (
       <section className="rounded-3xl bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">
           Players Management
@@ -446,7 +624,9 @@ export default function AdminClient({
           </p>
         )}
       </section>
+      )}
 
+      {activeEvent && (
       <section className="rounded-3xl bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Rounds Overview</h2>
         <p className="mt-1 text-sm text-slate-600">
@@ -508,8 +688,9 @@ export default function AdminClient({
           </div>
         )}
       </section>
+      )}
 
-      {showItinerary && (
+      {activeEvent && showItinerary && (
         <section className="rounded-3xl bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-900">Itinerary</h2>
           <p className="mt-1 text-sm text-slate-600">
