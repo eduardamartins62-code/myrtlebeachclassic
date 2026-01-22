@@ -6,13 +6,16 @@ import Link from "next/link";
 import { EVENT_NAME, EVENT_SLUG } from "@/lib/event";
 import { supabase } from "@/lib/supabaseClient";
 import {
+  buildRoundLeaderboard,
   buildTripStandings,
+  rankRoundLeaderboard,
   rankTripStandings,
   type EventRound,
   type PlayerRow,
   type ScoreRow,
   type RankedTripStandingRow
 } from "@/lib/leaderboard";
+import SiteNav from "@/app/components/SiteNav";
 
 type EventRow = {
   id: string;
@@ -157,9 +160,23 @@ export default function HomePage() {
     return rankTripStandings(rows);
   }, [event, players, rounds, scores]);
 
+  const roundLeaderboards = useMemo(() => {
+    return rounds.map((round) => {
+      const roundScores = scores.filter(
+        (score) => score.round_id === round.id
+      );
+      const rows = buildRoundLeaderboard(players, roundScores, round);
+      return {
+        round,
+        leaderboard: rankRoundLeaderboard(rows)
+      };
+    });
+  }, [rounds, players, scores]);
+
   const eventLabel = event?.name ?? EVENT_NAME;
   return (
     <main className="min-h-screen bg-slate-950 text-white">
+      <SiteNav />
       <div className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.25),_transparent_50%),radial-gradient(circle_at_30%_60%,_rgba(56,189,248,0.18),_transparent_55%)]" />
         <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-10 px-5 py-10">
@@ -413,6 +430,86 @@ export default function HomePage() {
                     </span>
                   )}
                 </Link>
+              ))}
+            </div>
+          </section>
+
+          <section className="grid gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/60">
+                  Round Leaderboards
+                </p>
+                <h2 className="mt-2 text-lg font-semibold text-white">
+                  Per-round standings
+                </h2>
+              </div>
+            </div>
+            {roundLeaderboards.length === 0 && (
+              <div className="rounded-2xl border border-dashed border-emerald-200/40 bg-white/5 px-5 py-4 text-sm text-white/70">
+                No round leaderboards yet. Add rounds and scores to get started.
+              </div>
+            )}
+            <div className="grid gap-4 lg:grid-cols-2">
+              {roundLeaderboards.map(({ round, leaderboard }) => (
+                <div
+                  key={round.id}
+                  className="rounded-3xl border border-white/10 bg-white/5 p-5"
+                >
+                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-white/60">
+                    <span>Round {round.round_number}</span>
+                    <span>{round.course ?? "Course TBD"}</span>
+                  </div>
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="w-full min-w-[320px] border-collapse text-sm text-white">
+                      <thead>
+                        <tr className="border-b border-white/10 text-left text-[10px] font-semibold uppercase tracking-[0.2em] text-white/50">
+                          <th className="py-2 pr-2">Pos</th>
+                          <th className="py-2 pr-2">Player</th>
+                          <th className="py-2 text-right">Net</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {leaderboard.map((row, index) => (
+                          <tr
+                            key={row.playerId}
+                            className={
+                              index % 2 === 0 ? "bg-white/5" : "bg-transparent"
+                            }
+                          >
+                            <td className="py-2 pr-2 font-semibold text-white">
+                              {row.position}
+                            </td>
+                            <td className="py-2 pr-2 text-white/80">
+                              {row.name}
+                            </td>
+                            <td className="py-2 text-right font-semibold text-emerald-200">
+                              {row.netToPar === null
+                                ? "-"
+                                : formatDelta(row.netToPar)}
+                            </td>
+                          </tr>
+                        ))}
+                        {leaderboard.length === 0 && (
+                          <tr>
+                            <td
+                              colSpan={3}
+                              className="py-4 text-center text-xs text-white/60"
+                            >
+                              Scores pending.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <Link
+                    className="mt-4 inline-flex text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200"
+                    href={`/r/${round.id}`}
+                  >
+                    View full leaderboard
+                  </Link>
+                </div>
               ))}
             </div>
           </section>

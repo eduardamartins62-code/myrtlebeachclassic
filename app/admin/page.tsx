@@ -1,45 +1,19 @@
 import AdminClient from "./AdminClient";
-import { EVENT_NAME, EVENT_SLUG } from "@/lib/event";
+import { EVENT_SLUG } from "@/lib/event";
+import { requireSuperAdmin } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import type { Database } from "@/types/supabase";
 
-type EventRow = {
-  id: string;
-  name: string;
-  slug: string;
-  created_at: string;
-};
-
-type RoundRow = {
-  id: string;
-  round_number: number;
-  course: string | null;
-  date: string | null;
-  par: number;
-};
-
-type PlayerRow = {
-  id: string;
-  name: string;
-  handicap: number;
-  starting_score: number;
-};
-
-type ItineraryItemRow = {
-  id: string;
-  category: string;
-  day: string | null;
-  name: string;
-  description: string | null;
-  address: string | null;
-  url: string | null;
-  sort_order: number | null;
-};
+type EventRow = Database["public"]["Tables"]["events"]["Row"];
+type RoundRow = Database["public"]["Tables"]["rounds"]["Row"];
+type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
 
 type AdminPageProps = {
   searchParams?: { eventId?: string };
 };
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
+  await requireSuperAdmin();
   const supabaseAdmin = getSupabaseAdmin();
 
   const { data: eventsData } = await supabaseAdmin
@@ -47,7 +21,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     .select("*")
     .order("created_at", { ascending: false });
 
-  const events = (eventsData as EventRow[]) ?? [];
+  const events = eventsData ?? [];
   const eventId = searchParams?.eventId;
 
   let event: EventRow | null = null;
@@ -58,7 +32,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .select("*")
       .eq("id", eventId)
       .maybeSingle();
-    event = (selectedEvent as EventRow | null) ?? null;
+    event = selectedEvent ?? null;
   }
 
   if (!event) {
@@ -67,7 +41,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .select("*")
       .eq("slug", EVENT_SLUG)
       .maybeSingle();
-    event = (slugEvent as EventRow | null) ?? null;
+    event = slugEvent ?? null;
   }
 
   if (!event && events.length > 0) {
@@ -76,8 +50,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   let players: PlayerRow[] = [];
   let rounds: RoundRow[] = [];
-  let itineraryItems: ItineraryItemRow[] = [];
-  let showItinerary = false;
 
   if (event) {
     const [playersRes, roundsRes] = await Promise.all([
@@ -93,21 +65,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         .order("round_number", { ascending: true })
     ]);
 
-    players = (playersRes.data as PlayerRow[]) ?? [];
-    rounds = (roundsRes.data as RoundRow[]) ?? [];
-
-    const itineraryRes = await supabaseAdmin
-      .from("itinerary_items")
-      .select(
-        "id,category,day,name,description,address,url,sort_order"
-      )
-      .eq("event_id", event.id)
-      .order("sort_order", { ascending: true });
-
-    if (!itineraryRes.error) {
-      showItinerary = true;
-      itineraryItems = (itineraryRes.data as ItineraryItemRow[]) ?? [];
-    }
+    players = playersRes.data ?? [];
+    rounds = roundsRes.data ?? [];
   }
 
   return (
@@ -116,8 +75,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       initialEvents={events}
       initialPlayers={players}
       initialRounds={rounds}
-      initialItineraryItems={itineraryItems}
-      showItinerary={showItinerary}
     />
   );
 }

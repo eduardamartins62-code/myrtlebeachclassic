@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { getCurrentUserWithRole } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
-const ADMIN_COOKIE_NAME = "mbc_admin";
-
 export async function POST(request: Request) {
-  const supabaseAdmin = getSupabaseAdmin();
-  const adminCookie = cookies().get(ADMIN_COOKIE_NAME)?.value;
-
-  if (adminCookie !== "1") {
+  const { user, role } = await getCurrentUserWithRole();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
+  const supabaseAdmin = getSupabaseAdmin();
   const body = (await request.json()) as { name?: string; slug?: string };
   const eventName = body.name?.trim();
   const eventSlug = body.slug?.trim();

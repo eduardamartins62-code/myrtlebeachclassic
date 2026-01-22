@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function AdminLoginPage() {
   const router = useRouter();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -14,22 +16,13 @@ export default function AdminLoginPage() {
     setLoading(true);
     setError(null);
 
-    const response = await fetch("/api/admin/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ password })
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password
     });
 
-    if (response.status === 401) {
-      setError("Incorrect password");
-      setLoading(false);
-      return;
-    }
-
-    if (!response.ok) {
-      setError("Unable to sign in right now.");
+    if (signInError) {
+      setError(signInError.message || "Unable to sign in right now.");
       setLoading(false);
       return;
     }
@@ -44,23 +37,33 @@ export default function AdminLoginPage() {
           Myrtle Beach Classic 2026
         </p>
         <h1 className="mt-3 text-2xl font-semibold text-slate-900">
-          Admin Login
+          Sign in
         </h1>
         <p className="mt-2 text-sm text-slate-600">
-          Enter the admin password to continue.
+          Use your admin or score keeper credentials to continue.
         </p>
       </header>
 
       <section className="rounded-3xl bg-white p-6 shadow-sm">
         <form className="grid gap-4" onSubmit={handleSubmit}>
           <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
+            Email
+            <input
+              className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
+              placeholder="you@example.com"
+              type="email"
+              value={email}
+              onChange={(eventItem) => setEmail(eventItem.target.value)}
+            />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-semibold text-slate-600">
             Password
             <input
               className="h-12 rounded-2xl border border-slate-200 px-4 text-base text-slate-900 focus:border-pine-500 focus:outline-none"
-              placeholder="Admin password"
+              placeholder="Password"
               type="password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(eventItem) => setPassword(eventItem.target.value)}
             />
           </label>
           {error && (
@@ -71,7 +74,7 @@ export default function AdminLoginPage() {
             disabled={loading}
             type="submit"
           >
-            {loading ? "Signing in..." : "Log in"}
+            {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
       </section>
