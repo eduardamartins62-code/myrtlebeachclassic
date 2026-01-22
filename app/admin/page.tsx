@@ -21,7 +21,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     .select("*")
     .order("created_at", { ascending: false });
 
-  const events = eventsData ?? [];
+  const events: EventRow[] = eventsData ?? [];
   const eventId = searchParams?.eventId;
 
   let event: EventRow | null = null;
@@ -32,7 +32,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .select("*")
       .eq("id", eventId)
       .maybeSingle();
-    event = selectedEvent ?? null;
+    const selectedEventRow: EventRow | null = selectedEvent ?? null;
+    event = selectedEventRow;
   }
 
   if (!event) {
@@ -41,7 +42,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .select("*")
       .eq("slug", EVENT_SLUG)
       .maybeSingle();
-    event = slugEvent ?? null;
+    const slugEventRow: EventRow | null = slugEvent ?? null;
+    event = slugEventRow;
   }
 
   if (!event && events.length > 0) {
