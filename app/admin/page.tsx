@@ -2,7 +2,7 @@ import AdminClient from "./AdminClient";
 import { EVENT_SLUG } from "@/lib/event";
 import { requireSuperAdmin } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import type { Database } from "@/types/supabase";
+import type { Database } from "@/lib/database.types";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 type RoundRow = Database["public"]["Tables"]["rounds"]["Row"];
@@ -19,7 +19,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const { data: eventsData } = await supabaseAdmin
     .from("events")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .returns<EventRow[]>();
 
   const events: EventRow[] = eventsData ?? [];
   const eventId = searchParams?.eventId;
