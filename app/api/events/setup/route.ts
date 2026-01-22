@@ -17,33 +17,37 @@ export async function POST(request: Request) {
   const eventSlug = body.slug?.trim();
 
   if (!eventName || !eventSlug) {
-    return NextResponse.json({ error: "Missing event name" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Missing event name or slug" },
+      { status: 400 }
+    );
   }
 
   const { data: existingEvent } = await supabaseAdmin
     .from("events")
-    .select("id")
+    .select("id,name,slug,created_at")
     .eq("slug", eventSlug)
     .maybeSingle();
 
-  let eventId = existingEvent?.id;
-
-  if (!eventId) {
-    const { data: createdEvent, error } = await supabaseAdmin
-      .from("events")
-      .insert({
-        name: eventName,
-        slug: eventSlug
-      })
-      .select("id")
-      .single();
-
-    if (error || !createdEvent) {
-      return NextResponse.json({ error: "Unable to create event" }, { status: 500 });
-    }
-
-    eventId = createdEvent.id;
+  if (existingEvent) {
+    return NextResponse.json({ event: existingEvent });
   }
 
-  return NextResponse.json({ eventId });
+  const { data: createdEvent, error } = await supabaseAdmin
+    .from("events")
+    .insert({
+      name: eventName,
+      slug: eventSlug
+    })
+    .select("id,name,slug,created_at")
+    .single();
+
+  if (error || !createdEvent) {
+    return NextResponse.json(
+      { error: "Unable to create event" },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ event: createdEvent });
 }
