@@ -6,8 +6,18 @@ import type { Database } from "@/types/supabase";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 type RoundRow = Database["public"]["Tables"]["rounds"]["Row"];
-type ItineraryItem =
-  Database["public"]["Tables"]["itinerary_items"]["Row"];
+type ItineraryItem = {
+  id: string;
+  category: string;
+  title: string;
+  description: string | null;
+  address: string | null;
+  website_url: string | null;
+  day_label: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  sort_order: number | null;
+};
 
 type GroupedDay = {
   label: string;
@@ -57,26 +67,31 @@ export default async function ItineraryPage() {
     .order("day_label", { ascending: true })
     .order("sort_order", { ascending: true });
 
-  const items = itineraryItems ?? [];
+  const items: ItineraryItem[] = (itineraryItems ?? []) as ItineraryItem[];
   const eventName = (event as EventRow | null)?.name ?? EVENT_NAME;
   const dateRange = formatDateRange((rounds ?? []) as RoundRow[]);
-  const primaryHotel = items.find((item) => item.category === "HOTEL");
+  const primaryHotel = items.find(
+    (item: ItineraryItem) => item.category === "HOTEL"
+  );
 
-  const grouped = items.reduce<Record<string, GroupedDay>>((acc, item) => {
-    const dayLabel = item.day_label ?? "Trip Highlights";
-    if (!acc[dayLabel]) {
-      acc[dayLabel] = {
-        label: dayLabel,
-        categories: {}
-      };
-    }
-    const category = item.category ?? "OTHER";
-    if (!acc[dayLabel].categories[category]) {
-      acc[dayLabel].categories[category] = [];
-    }
-    acc[dayLabel].categories[category].push(item);
-    return acc;
-  }, {});
+  const grouped = items.reduce<Record<string, GroupedDay>>(
+    (acc, item: ItineraryItem) => {
+      const dayLabel = item.day_label ?? "Trip Highlights";
+      if (!acc[dayLabel]) {
+        acc[dayLabel] = {
+          label: dayLabel,
+          categories: {}
+        };
+      }
+      const category = item.category ?? "OTHER";
+      if (!acc[dayLabel].categories[category]) {
+        acc[dayLabel].categories[category] = [];
+      }
+      acc[dayLabel].categories[category].push(item);
+      return acc;
+    },
+    {}
+  );
 
   const groupedDays = Object.values(grouped);
 
@@ -135,7 +150,7 @@ export default async function ItineraryPage() {
                     {categoryLabels[category] ?? category}
                   </h3>
                   <div className="grid gap-3">
-                    {itemsForDay.map((item) => (
+                    {itemsForDay.map((item: ItineraryItem) => (
                       <div
                         key={item.id}
                         className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3"
