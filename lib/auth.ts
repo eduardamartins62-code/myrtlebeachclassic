@@ -36,11 +36,11 @@ export async function requireSuperAdmin() {
   const { user, role } = await getCurrentUserWithRole();
 
   if (!user) {
-    redirect("/admin-login");
+    redirect("/login");
   }
 
   if (role !== "SUPER_ADMIN") {
-    redirect("/");
+    redirect("/login");
   }
 
   return { user, role };
