@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import EventCreateForm from "./EventCreateForm";
 
@@ -8,6 +9,43 @@ type EventRow = {
   slug: string;
   created_at: string;
 };
+
+export type CreateEventState = {
+  ok: boolean;
+  error: string | null;
+};
+
+export async function createEvent(
+  _prevState: CreateEventState,
+  formData: FormData
+): Promise<CreateEventState> {
+  "use server";
+
+  const supabaseAdmin = getSupabaseAdmin();
+  const name = String(formData.get("name") ?? "").trim();
+  const slug = String(formData.get("slug") ?? "").trim();
+
+  if (!name || !slug) {
+    return { ok: false, error: "Name and slug are required." };
+  }
+
+  try {
+    const { error } = await supabaseAdmin
+      .from("events")
+      .insert([{ name, slug }]);
+
+    if (error) {
+      console.error("Error creating event:", error);
+      return { ok: false, error: error.message };
+    }
+  } catch (error) {
+    console.error("Error creating event:", error);
+    return { ok: false, error: "Unable to create event." };
+  }
+
+  revalidatePath("/admin/events");
+  return { ok: true, error: null };
+}
 
 export default async function AdminEventsPage() {
   const supabaseAdmin = getSupabaseAdmin();
@@ -93,7 +131,7 @@ export default async function AdminEventsPage() {
             Provide the public name and slug for the event.
           </p>
           <div className="mt-4">
-            <EventCreateForm />
+            <EventCreateForm action={createEvent} />
           </div>
         </div>
       </div>
