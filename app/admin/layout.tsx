@@ -4,6 +4,8 @@ import Link from "next/link";
 const adminNav = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/events", label: "Events" },
+  { href: "/admin/rounds", label: "Rounds" },
+  { href: "/admin/players", label: "Players" },
   { href: "/admin/itinerary", label: "Itinerary" },
   { href: "/admin/history", label: "History" },
   { href: "/admin/users", label: "Users" }
