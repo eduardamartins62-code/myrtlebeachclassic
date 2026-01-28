@@ -25,3 +25,5 @@ export const createSupabaseServerClient = () => {
     }
   });
 };
+
+export const getSupabaseServer = () => createSupabaseServerClient();
