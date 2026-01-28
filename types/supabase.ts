@@ -152,6 +152,8 @@ export type Database = {
           id: string;
           event_id: string;
           name: string;
+          nickname: string | null;
+          image_url: string | null;
           handicap: number;
           starting_score: number;
           created_at: string;
@@ -160,6 +162,8 @@ export type Database = {
           id?: string;
           event_id: string;
           name: string;
+          nickname?: string | null;
+          image_url?: string | null;
           handicap?: number;
           starting_score?: number;
           created_at?: string;
@@ -168,6 +172,8 @@ export type Database = {
           id?: string;
           event_id?: string;
           name?: string;
+          nickname?: string | null;
+          image_url?: string | null;
           handicap?: number;
           starting_score?: number;
           created_at?: string;

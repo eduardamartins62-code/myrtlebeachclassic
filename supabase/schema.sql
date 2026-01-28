@@ -31,6 +31,8 @@ create table if not exists players (
   id uuid primary key default gen_random_uuid(),
   event_id uuid not null references events(id) on delete cascade,
   name text not null,
+  nickname text,
+  image_url text,
   handicap int not null default 0,
   starting_score int not null default 0,
   created_at timestamptz not null default now()
