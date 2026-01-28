@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { requireSession } from "@/lib/auth";
 
 const adminNav = [
   { href: "/admin", label: "Dashboard" },
@@ -10,13 +9,7 @@ const adminNav = [
   { href: "/admin/users", label: "Users" }
 ];
 
-export default async function AdminLayout({
-  children
-}: {
-  children: ReactNode;
-}) {
-  await requireSession();
-
+export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
