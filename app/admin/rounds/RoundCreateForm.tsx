@@ -1,14 +1,13 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { createRound } from "./actions";
 
 type RoundCreateFormProps = {
   eventId: string;
 };
 
 export default function RoundCreateForm({ eventId }: RoundCreateFormProps) {
-  const router = useRouter();
   const [roundNumber, setRoundNumber] = useState(1);
   const [course, setCourse] = useState("");
   const [date, setDate] = useState("");
@@ -23,29 +22,18 @@ export default function RoundCreateForm({ eventId }: RoundCreateFormProps) {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/admin/api/rounds/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          event_id: eventId,
-          round_number: Number(roundNumber),
-          course: course || null,
-          date: date || null,
-          par: Number(par),
-          entry_pin: entryPin || null
-        })
-      });
+      const formData = new FormData(event.currentTarget);
+      const result = await createRound(formData);
 
-      if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error ?? "Unable to create round.");
+      if (!result.ok) {
+        throw new Error(result.error ?? "Unable to create round.");
       }
 
       setRoundNumber((prev) => prev + 1);
       setCourse("");
       setDate("");
+      setPar(72);
       setEntryPin("");
-      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create round.");
     } finally {
@@ -55,6 +43,7 @@ export default function RoundCreateForm({ eventId }: RoundCreateFormProps) {
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
+      <input name="event_id" type="hidden" value={eventId} />
       <div className="space-y-2">
         <label
           className="text-sm font-semibold text-slate-700"
@@ -74,14 +63,18 @@ export default function RoundCreateForm({ eventId }: RoundCreateFormProps) {
         />
       </div>
       <div className="space-y-2">
-        <label className="text-sm font-semibold text-slate-700" htmlFor="course">
+        <label
+          className="text-sm font-semibold text-slate-700"
+          htmlFor="course_name"
+        >
           Course name
         </label>
         <input
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-          id="course"
-          name="course"
+          id="course_name"
+          name="course_name"
           onChange={(event) => setCourse(event.target.value)}
+          required
           type="text"
           value={course}
         />
