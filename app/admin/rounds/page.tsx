@@ -1,10 +1,21 @@
 import Link from "next/link";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import type { Database } from "@/types/supabase";
 import RoundCreateForm from "./RoundCreateForm";
 
-type EventRow = Database["public"]["Tables"]["events"]["Row"];
-type RoundRow = Database["public"]["Tables"]["rounds"]["Row"];
+type EventRow = {
+  id: string;
+  name: string;
+};
+
+type RoundRow = {
+  id: string;
+  event_id: string;
+  round_number: number;
+  course: string | null;
+  date: string | null;
+  par: number;
+  entry_pin: string | null;
+};
 
 type AdminRoundsPageProps = {
   searchParams?: { eventId?: string };
@@ -16,23 +27,24 @@ export default async function AdminRoundsPage({
   const eventId = searchParams?.eventId ?? "";
   const supabaseAdmin = getSupabaseAdmin();
 
-  const { data: event } = eventId
+  const { data: eventData } = eventId
     ? await supabaseAdmin
         .from("events")
-        .select("*")
+        .select("id, name")
         .eq("id", eventId)
         .single()
     : { data: null };
 
-  const { data: rounds } = eventId
+  const { data: roundsData } = eventId
     ? await supabaseAdmin
         .from("rounds")
-        .select("*")
+        .select("id, event_id, round_number, course, date, par, entry_pin")
         .eq("event_id", eventId)
         .order("round_number", { ascending: true })
     : { data: [] };
 
-  const selectedEvent = event as EventRow | null;
+  const selectedEvent = eventData as EventRow | null;
+  const rounds = (roundsData ?? []) as RoundRow[];
 
   return (
     <section className="space-y-6">
@@ -72,16 +84,16 @@ export default async function AdminRoundsPage({
                 Rounds list
               </p>
               <span className="text-xs text-slate-500">
-                {(rounds ?? []).length} total
+                {rounds.length} total
               </span>
             </div>
-            {(rounds ?? []).length === 0 ? (
+            {rounds.length === 0 ? (
               <p className="mt-4 text-base text-slate-600">
                 No rounds have been added yet.
               </p>
             ) : (
               <div className="mt-4 space-y-3">
-                {(rounds as RoundRow[]).map((round) => (
+                {rounds.map((round) => (
                   <div
                     key={round.id}
                     className="rounded-2xl border border-slate-200 p-4"
