@@ -1,17 +1,21 @@
 import Link from "next/link";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import type { Database } from "@/types/supabase";
 import EventCreateForm from "./EventCreateForm";
 
-type EventRow = Database["public"]["Tables"]["events"]["Row"];
+type EventRow = {
+  id: string;
+  name: string;
+  slug: string;
+  created_at: string;
+};
 
 export default async function AdminEventsPage() {
   const supabaseAdmin = getSupabaseAdmin();
-  const { data, error } = await supabaseAdmin
+  const { data: eventsData, error } = await supabaseAdmin
     .from("events")
-    .select("*")
+    .select("id, name, slug, created_at")
     .order("created_at", { ascending: false });
-  const events = (data ?? []) as EventRow[];
+  const events = (eventsData ?? []) as EventRow[];
 
   return (
     <section className="space-y-6">
