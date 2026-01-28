@@ -11,9 +11,10 @@ type RoundRow = {
   id: string;
   event_id: string;
   round_number: number;
-  course: string | null;
+  course_name: string | null;
   date: string | null;
-  par: number;
+  start_time: string | null;
+  par: number | null;
   entry_pin: string | null;
 };
 
@@ -38,7 +39,9 @@ export default async function AdminRoundsPage({
   const { data: roundsData } = eventId
     ? await supabaseAdmin
         .from("rounds")
-        .select("id, event_id, round_number, course, date, par, entry_pin")
+        .select(
+          "id, event_id, round_number, course_name, date, start_time, par, entry_pin"
+        )
         .eq("event_id", eventId)
         .order("round_number", { ascending: true })
     : { data: [] };
@@ -113,13 +116,13 @@ export default async function AdminRoundsPage({
                         <dt className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
                           Course
                         </dt>
-                        <dd>{round.course ?? "TBD"}</dd>
+                        <dd>{round.course_name ?? "TBD"}</dd>
                       </div>
                       <div>
                         <dt className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
                           Par
                         </dt>
-                        <dd>{round.par}</dd>
+                        <dd>{round.par ?? "TBD"}</dd>
                       </div>
                       <div>
                         <dt className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">

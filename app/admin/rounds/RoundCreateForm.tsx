@@ -1,17 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { createRound } from "./actions";
 
 type RoundCreateFormProps = {
   eventId: string;
 };
 
+type CreateRoundResult = {
+  ok: boolean;
+  error: string;
+};
+
 export default function RoundCreateForm({ eventId }: RoundCreateFormProps) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [roundNumber, setRoundNumber] = useState(1);
-  const [course, setCourse] = useState("");
+  const [courseName, setCourseName] = useState("");
   const [date, setDate] = useState("");
+  const [startTime, setStartTime] = useState("");
   const [par, setPar] = useState(72);
   const [entryPin, setEntryPin] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -22,30 +30,23 @@ export default function RoundCreateForm({ eventId }: RoundCreateFormProps) {
     setError(null);
     setIsSubmitting(true);
 
-    try {
-      const response = await fetch("/admin/api/rounds/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          event_id: eventId,
-          round_number: Number(roundNumber),
-          course: course || null,
-          date: date || null,
-          par: Number(par),
-          entry_pin: entryPin || null
-        })
-      });
+    const formData = new FormData(event.currentTarget);
 
-      if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error ?? "Unable to create round.");
+    try {
+      const result = (await createRound(formData)) as CreateRoundResult;
+
+      if (!result.ok) {
+        throw new Error(result.error || "Unable to create round.");
       }
 
       setRoundNumber((prev) => prev + 1);
-      setCourse("");
+      setCourseName("");
       setDate("");
+      setStartTime("");
       setEntryPin("");
-      router.refresh();
+      startTransition(() => {
+        router.refresh();
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create round.");
     } finally {
@@ -55,6 +56,7 @@ export default function RoundCreateForm({ eventId }: RoundCreateFormProps) {
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
+      <input name="event_id" type="hidden" value={eventId} />
       <div className="space-y-2">
         <label
           className="text-sm font-semibold text-slate-700"
@@ -74,16 +76,20 @@ export default function RoundCreateForm({ eventId }: RoundCreateFormProps) {
         />
       </div>
       <div className="space-y-2">
-        <label className="text-sm font-semibold text-slate-700" htmlFor="course">
+        <label
+          className="text-sm font-semibold text-slate-700"
+          htmlFor="course_name"
+        >
           Course name
         </label>
         <input
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-          id="course"
-          name="course"
-          onChange={(event) => setCourse(event.target.value)}
+          id="course_name"
+          name="course_name"
+          onChange={(event) => setCourseName(event.target.value)}
+          required
           type="text"
-          value={course}
+          value={courseName}
         />
       </div>
       <div className="space-y-2">
@@ -97,6 +103,22 @@ export default function RoundCreateForm({ eventId }: RoundCreateFormProps) {
           onChange={(event) => setDate(event.target.value)}
           type="date"
           value={date}
+        />
+      </div>
+      <div className="space-y-2">
+        <label
+          className="text-sm font-semibold text-slate-700"
+          htmlFor="start_time"
+        >
+          Start time
+        </label>
+        <input
+          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+          id="start_time"
+          name="start_time"
+          onChange={(event) => setStartTime(event.target.value)}
+          type="time"
+          value={startTime}
         />
       </div>
       <div className="space-y-2">
@@ -133,7 +155,7 @@ export default function RoundCreateForm({ eventId }: RoundCreateFormProps) {
       {error ? <p className="text-sm text-rose-500">{error}</p> : null}
       <button
         className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={isSubmitting}
+        disabled={isSubmitting || isPending}
         type="submit"
       >
         {isSubmitting ? "Saving..." : "Add round"}
