@@ -1,30 +1,21 @@
 import type { ReactNode } from "react";
-import { requireSuperAdmin } from "@/lib/auth";
 
 export default async function AdminLayout({
   children
 }: {
   children: ReactNode;
 }) {
-  await requireSuperAdmin();
-
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-          <h1 className="text-lg font-semibold">
-            Myrtle Beach Classic – Admin
-          </h1>
-          <nav className="flex gap-4 text-sm">
-            <a href="/admin">Dashboard</a>
-            <a href="/admin/events">Events</a>
-            <a href="/admin/itinerary">Itinerary</a>
-            <a href="/admin/history">History</a>
-            <a href="/admin/users">Users</a>
-          </nav>
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-4xl flex-col gap-2 px-6 py-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            Admin
+          </p>
+          <h1 className="text-2xl font-semibold">Myrtle Beach Classic</h1>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-4xl px-6 py-10">{children}</main>
     </div>
   );
 }
