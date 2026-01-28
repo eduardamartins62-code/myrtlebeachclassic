@@ -35,14 +35,8 @@ export async function getCurrentUserWithRole() {
 export async function requireSuperAdmin() {
   const { user, role } = await getCurrentUserWithRole();
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  if (role !== "SUPER_ADMIN") {
-    redirect("/login");
-  }
-
+  // Temporary bypass for admin rebuild. Reintroduce guard once new admin flows
+  // are ready.
   return { user, role };
 }
 
