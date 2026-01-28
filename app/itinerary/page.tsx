@@ -6,18 +6,7 @@ import type { Database } from "@/types/supabase";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 type RoundRow = Database["public"]["Tables"]["rounds"]["Row"];
-type ItineraryItem = {
-  id: string;
-  category: string;
-  title: string;
-  description: string | null;
-  address: string | null;
-  website_url: string | null;
-  day_label: string | null;
-  start_time: string | null;
-  end_time: string | null;
-  sort_order: number | null;
-};
+type ItineraryItem = Database["public"]["Tables"]["itinerary_items"]["Row"];
 
 type GroupedDay = {
   label: string;
@@ -27,7 +16,8 @@ type GroupedDay = {
 const categoryLabels: Record<string, string> = {
   HOTEL: "Hotel",
   GOLF: "Golf",
-  RESTAURANT: "Restaurants Nearby",
+  FOOD: "Food & Dining",
+  RESTAURANT: "Food & Dining",
   NIGHTLIFE: "Nightlife & Bars",
   OTHER: "Other Activities"
 };
@@ -65,7 +55,8 @@ export default async function ItineraryPage() {
     .select("*")
     .eq("is_active", true)
     .order("day_label", { ascending: true })
-    .order("sort_order", { ascending: true });
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
 
   const items: ItineraryItem[] = (itineraryItems ?? []) as ItineraryItem[];
   const eventName = (event as EventRow | null)?.name ?? EVENT_NAME;
@@ -93,7 +84,27 @@ export default async function ItineraryPage() {
     {}
   );
 
-  const groupedDays = Object.values(grouped);
+  const groupedDays = Object.values(grouped).map((day) => {
+    const sortedCategories = Object.entries(day.categories).map(
+      ([category, categoryItems]) => {
+        const sortedItems = [...categoryItems].sort((a, b) => {
+          if (a.sort_order !== null || b.sort_order !== null) {
+            return (a.sort_order ?? Number.MAX_SAFE_INTEGER) -
+              (b.sort_order ?? Number.MAX_SAFE_INTEGER);
+          }
+          const categoryCompare = a.category.localeCompare(b.category);
+          if (categoryCompare !== 0) return categoryCompare;
+          return a.title.localeCompare(b.title);
+        });
+        return [category, sortedItems] as const;
+      }
+    );
+
+    return {
+      ...day,
+      categories: Object.fromEntries(sortedCategories)
+    };
+  });
 
   return (
     <main className="min-h-screen bg-white">
