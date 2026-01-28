@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabaseServer";
+import {
+  createSupabaseServerClient,
+  getSupabaseServer
+} from "@/lib/supabaseServer";
 
 export type UserRole = "SUPER_ADMIN" | "SCORE_KEEPER" | "PLAYER" | "GUEST";
 
@@ -30,6 +33,13 @@ export async function getCurrentUserWithRole() {
     user,
     role: normalizeRole(profile?.role ?? "PLAYER")
   };
+}
+
+export async function requireSession() {
+  const supabase = getSupabaseServer();
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) redirect("/login");
+  return data.session;
 }
 
 export async function requireSuperAdmin() {
