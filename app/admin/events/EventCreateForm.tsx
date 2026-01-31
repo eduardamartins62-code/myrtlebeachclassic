@@ -1,44 +1,49 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useFormState, useFormStatus } from "react-dom";
+import type { CreateEventState } from "./page";
 
-export default function EventCreateForm() {
-  const router = useRouter();
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+type EventCreateFormProps = {
+  action: (
+    prevState: CreateEventState,
+    formData: FormData
+  ) => Promise<CreateEventState>;
+};
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError(null);
-    setIsSubmitting(true);
+const initialState: CreateEventState = { ok: false, error: null };
 
-    try {
-      const response = await fetch("/admin/api/events/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, slug })
-      });
-
-      if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error ?? "Unable to create event.");
-      }
-
-      setName("");
-      setSlug("");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to create event.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+function SubmitButton({ hasEdits }: { hasEdits: boolean }) {
+  const { pending } = useFormStatus();
+  const isSubmitting = pending && hasEdits;
 
   return (
-    <form className="space-y-4" onSubmit={handleSubmit}>
+    <button
+      className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+      disabled={pending}
+      type="submit"
+    >
+      {isSubmitting ? "Saving..." : "Add event"}
+    </button>
+  );
+}
+
+export default function EventCreateForm({ action }: EventCreateFormProps) {
+  const [state, formAction] = useFormState(action, initialState);
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [hasEdits, setHasEdits] = useState(false);
+
+  useEffect(() => {
+    if (state.ok) {
+      setName("");
+      setSlug("");
+      setHasEdits(false);
+    }
+  }, [state.ok]);
+
+  return (
+    <form className="space-y-4" action={formAction}>
       <div className="space-y-2">
         <label className="text-sm font-semibold text-slate-700" htmlFor="name">
           Name
@@ -47,7 +52,10 @@ export default function EventCreateForm() {
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
           id="name"
           name="name"
-          onChange={(event) => setName(event.target.value)}
+          onChange={(event) => {
+            setName(event.target.value);
+            setHasEdits(true);
+          }}
           required
           type="text"
           value={name}
@@ -61,20 +69,24 @@ export default function EventCreateForm() {
           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
           id="slug"
           name="slug"
-          onChange={(event) => setSlug(event.target.value)}
+          onChange={(event) => {
+            setSlug(event.target.value);
+            setHasEdits(true);
+          }}
           required
           type="text"
           value={slug}
         />
       </div>
-      {error ? <p className="text-sm text-rose-500">{error}</p> : null}
-      <button
-        className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={isSubmitting}
-        type="submit"
-      >
-        {isSubmitting ? "Saving..." : "Add event"}
-      </button>
+      {state.error ? (
+        <p className="text-sm text-rose-500">{state.error}</p>
+      ) : null}
+      {state.ok && !hasEdits ? (
+        <p className="text-sm text-emerald-600">
+          Event created successfully.
+        </p>
+      ) : null}
+      <SubmitButton hasEdits={hasEdits} />
     </form>
   );
 }
