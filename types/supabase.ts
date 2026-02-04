@@ -234,6 +234,51 @@ export type Database = {
         };
         Relationships: [];
       };
+      round_holes: {
+        Row: {
+          id: string;
+          round_id: string;
+          hole_number: number;
+          par: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          round_id: string;
+          hole_number: number;
+          par: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          round_id?: string;
+          hole_number?: number;
+          par?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      round_players: {
+        Row: {
+          id: string;
+          round_id: string;
+          player_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          round_id: string;
+          player_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          round_id?: string;
+          player_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       scores: {
         Row: {
           id: string;

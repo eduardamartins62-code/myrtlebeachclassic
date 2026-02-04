@@ -2,6 +2,8 @@ create extension if not exists "pgcrypto";
 
 -- Drop old tables to align with the new multi-round trip schema
 DROP TABLE IF EXISTS scores;
+DROP TABLE IF EXISTS round_players;
+DROP TABLE IF EXISTS round_holes;
 DROP TABLE IF EXISTS players;
 DROP TABLE IF EXISTS rounds;
 DROP TABLE IF EXISTS admins;
@@ -25,6 +27,23 @@ create table if not exists rounds (
   entry_pin text,
   created_at timestamptz not null default now(),
   unique (event_id, round_number)
+);
+
+create table if not exists round_holes (
+  id uuid primary key default gen_random_uuid(),
+  round_id uuid not null references rounds(id) on delete cascade,
+  hole_number int not null check (hole_number between 1 and 18),
+  par int not null check (par between 3 and 5),
+  created_at timestamptz not null default now(),
+  unique (round_id, hole_number)
+);
+
+create table if not exists round_players (
+  id uuid primary key default gen_random_uuid(),
+  round_id uuid not null references rounds(id) on delete cascade,
+  player_id uuid not null references players(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (round_id, player_id)
 );
 
 create table if not exists players (
@@ -58,6 +77,9 @@ create table if not exists event_admins (
 );
 
 create index if not exists idx_rounds_event on rounds(event_id);
+create index if not exists idx_round_holes_round on round_holes(round_id);
+create index if not exists idx_round_players_round on round_players(round_id);
+create index if not exists idx_round_players_player on round_players(player_id);
 create index if not exists idx_players_event on players(event_id);
 create index if not exists idx_scores_round on scores(round_id);
 create index if not exists idx_scores_player on scores(player_id);
@@ -78,6 +100,8 @@ execute function set_scores_updated_at();
 
 alter table events enable row level security;
 alter table rounds enable row level security;
+alter table round_holes enable row level security;
+alter table round_players enable row level security;
 alter table players enable row level security;
 alter table scores enable row level security;
 alter table event_admins enable row level security;
@@ -87,6 +111,14 @@ create policy "Public read events" on events
   using (true);
 
 create policy "Public read rounds" on rounds
+  for select
+  using (true);
+
+create policy "Public read round holes" on round_holes
+  for select
+  using (true);
+
+create policy "Public read round players" on round_players
   for select
   using (true);
 
@@ -124,6 +156,48 @@ create policy "Admins manage rounds" on rounds
   with check (
     exists (
       select 1 from event_admins
+      where event_admins.event_id = rounds.event_id
+        and event_admins.user_id = auth.uid()
+    )
+  );
+
+create policy "Admins manage round holes" on round_holes
+  for all
+  using (
+    exists (
+      select 1
+      from event_admins
+      join rounds on rounds.id = round_holes.round_id
+      where event_admins.event_id = rounds.event_id
+        and event_admins.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from event_admins
+      join rounds on rounds.id = round_holes.round_id
+      where event_admins.event_id = rounds.event_id
+        and event_admins.user_id = auth.uid()
+    )
+  );
+
+create policy "Admins manage round players" on round_players
+  for all
+  using (
+    exists (
+      select 1
+      from event_admins
+      join rounds on rounds.id = round_players.round_id
+      where event_admins.event_id = rounds.event_id
+        and event_admins.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from event_admins
+      join rounds on rounds.id = round_players.round_id
       where event_admins.event_id = rounds.event_id
         and event_admins.user_id = auth.uid()
     )
