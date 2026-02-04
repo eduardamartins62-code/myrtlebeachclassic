@@ -7,8 +7,6 @@ import PlayerEditCard from "./PlayerEditCard";
 
 type EventRow = Database["public"]["Tables"]["events"]["Row"];
 type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
-type RoundRow = Database["public"]["Tables"]["rounds"]["Row"];
-type RoundPlayerRow = Database["public"]["Tables"]["round_players"]["Row"];
 
 type AdminEventPlayersProps = {
   params: { eventId: string };
@@ -22,8 +20,7 @@ export default async function AdminEventPlayersPage({
 
   const [
     { data: eventData },
-    { data: playersData, error: playersError },
-    { data: roundsData }
+    { data: playersData, error: playersError }
   ] = await Promise.all([
     supabaseAdmin.from("events").select("id, name").eq("id", eventId),
     supabaseAdmin
@@ -32,12 +29,7 @@ export default async function AdminEventPlayersPage({
         "id, event_id, name, nickname, image_url, handicap, starting_score, created_at"
       )
       .eq("event_id", eventId)
-      .order("name", { ascending: true }),
-    supabaseAdmin
-      .from("rounds")
-      .select("id, event_id, round_number, course")
-      .eq("event_id", eventId)
-      .order("round_number", { ascending: true }),
+      .order("name", { ascending: true })
   ]);
 
   const event = (eventData ?? [])[0] as EventRow | undefined;
@@ -46,23 +38,6 @@ export default async function AdminEventPlayersPage({
   }
 
   const players = (playersData ?? []) as PlayerRow[];
-  const rounds = (roundsData ?? []) as RoundRow[];
-  const roundIds = rounds.map((round) => round.id);
-  const { data: roundPlayersData } = roundIds.length
-    ? await supabaseAdmin
-        .from("round_players")
-        .select("id, round_id, player_id")
-        .in("round_id", roundIds)
-    : { data: [] };
-  const roundPlayers = (roundPlayersData ?? []) as RoundPlayerRow[];
-  const assignmentsByPlayer = new Map<string, string[]>();
-
-  roundPlayers.forEach((assignment) => {
-    if (!assignmentsByPlayer.has(assignment.player_id)) {
-      assignmentsByPlayer.set(assignment.player_id, []);
-    }
-    assignmentsByPlayer.get(assignment.player_id)?.push(assignment.round_id);
-  });
 
   return (
     <section className="space-y-6">
@@ -76,7 +51,7 @@ export default async function AdminEventPlayersPage({
               {event.name} roster
             </h2>
             <p className="mt-2 text-base text-slate-600">
-              Manage avatars, handicaps, starting scores, and round assignments.
+              Manage avatars, handicaps, and starting scores.
             </p>
           </div>
           <Link
@@ -112,10 +87,7 @@ export default async function AdminEventPlayersPage({
               {players.map((player) => (
                 <PlayerEditCard
                   key={player.id}
-                  assignedRoundIds={assignmentsByPlayer.get(player.id) ?? []}
-                  eventId={event.id}
                   player={player}
-                  rounds={rounds}
                 />
               ))}
             </div>
