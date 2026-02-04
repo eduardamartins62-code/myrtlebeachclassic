@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import type { Database } from "@/types/supabase";
+import type { Database } from "@/lib/database.types";
 import PlayerCreateForm from "./PlayerCreateForm";
 import PlayerEditForm from "./PlayerEditForm";
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import type { Database } from "@/types/supabase";
+import type { Database } from "@/lib/database.types";
 
 type PlayerUpdate = Database["public"]["Tables"]["players"]["Update"] & {
   id: string;
@@ -22,7 +22,9 @@ export async function POST(request: Request) {
     .update({
       name: body.name,
       nickname: body.nickname ?? null,
-      image_url: body.image_url ?? null
+      image_url: body.image_url ?? null,
+      handicap: body.handicap ?? undefined,
+      starting_score: body.starting_score ?? undefined
     })
     .eq("id", body.id)
     .select("*")

@@ -1,13 +1,9 @@
 import Link from "next/link";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import EventCreateForm from "./EventCreateForm";
+import type { Database } from "@/lib/database.types";
 
-type EventRow = {
-  id: string;
-  name: string;
-  slug: string;
-  created_at: string;
-};
+type EventRow = Database["public"]["Tables"]["events"]["Row"];
 
 export default async function AdminEventsPage() {
   const supabaseAdmin = getSupabaseAdmin();
@@ -57,6 +53,7 @@ export default async function AdminEventsPage() {
                     <th className="px-4 py-3">Name</th>
                     <th className="px-4 py-3">Slug</th>
                     <th className="px-4 py-3">Created</th>
+                    <th className="px-4 py-3">Dashboard</th>
                     <th className="px-4 py-3">Rounds</th>
                   </tr>
                 </thead>
@@ -71,6 +68,14 @@ export default async function AdminEventsPage() {
                       </td>
                       <td className="px-4 py-3 text-slate-500">
                         {new Date(event.created_at).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link
+                          className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                          href={`/admin/events/${event.id}`}
+                        >
+                          View dashboard
+                        </Link>
                       </td>
                       <td className="px-4 py-3">
                         <Link

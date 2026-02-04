@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { Database } from "@/types/supabase";
+import type { Database } from "@/lib/database.types";
 
 type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
 
@@ -15,6 +15,10 @@ export default function PlayerEditForm({ player }: PlayerEditFormProps) {
   const [name, setName] = useState(player.name);
   const [nickname, setNickname] = useState(player.nickname ?? "");
   const [imageUrl, setImageUrl] = useState(player.image_url ?? "");
+  const [handicap, setHandicap] = useState(player.handicap ?? 0);
+  const [startingScore, setStartingScore] = useState(
+    player.starting_score ?? 0
+  );
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -31,7 +35,9 @@ export default function PlayerEditForm({ player }: PlayerEditFormProps) {
           id: player.id,
           name,
           nickname: nickname || null,
-          image_url: imageUrl || null
+          image_url: imageUrl || null,
+          handicap,
+          starting_score: startingScore
         })
       });
 
@@ -96,6 +102,40 @@ export default function PlayerEditForm({ player }: PlayerEditFormProps) {
             placeholder="https://"
             type="url"
             value={imageUrl}
+          />
+        </div>
+        <div className="space-y-2">
+          <label
+            className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400"
+            htmlFor={`player-handicap-${player.id}`}
+          >
+            Handicap
+          </label>
+          <input
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            id={`player-handicap-${player.id}`}
+            min={0}
+            onChange={(event) => setHandicap(Number(event.target.value))}
+            type="number"
+            value={handicap}
+          />
+        </div>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="space-y-2">
+          <label
+            className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400"
+            htmlFor={`player-starting-${player.id}`}
+          >
+            Starting score
+          </label>
+          <input
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            id={`player-starting-${player.id}`}
+            min={0}
+            onChange={(event) => setStartingScore(Number(event.target.value))}
+            type="number"
+            value={startingScore}
           />
         </div>
       </div>

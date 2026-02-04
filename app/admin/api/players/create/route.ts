@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import type { Database } from "@/types/supabase";
+import type { Database } from "@/lib/database.types";
 
 type PlayerInsert = Database["public"]["Tables"]["players"]["Insert"];
 
