@@ -8,7 +8,6 @@ type EventRow = Database["public"]["Tables"]["events"]["Row"];
 type RoundRow = Database["public"]["Tables"]["rounds"]["Row"];
 type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
 type RoundHoleRow = Database["public"]["Tables"]["round_holes"]["Row"];
-type RoundPlayerRow = Database["public"]["Tables"]["round_players"]["Row"];
 type ScoreRow = Database["public"]["Tables"]["scores"]["Row"];
 
 type AdminRoundScoresProps = {
@@ -24,9 +23,8 @@ export default async function AdminRoundScoresPage({
   const [
     { data: eventData },
     { data: roundData },
-    { data: playersData },
+    { data: playersData, error: playersError },
     { data: holesData },
-    { data: roundPlayersData },
     { data: scoresData }
   ] = await Promise.all([
     supabaseAdmin.from("events").select("id, name").eq("id", eventId),
@@ -37,18 +35,12 @@ export default async function AdminRoundScoresPage({
       .eq("event_id", eventId),
     supabaseAdmin
       .from("players")
-      .select(
-        "id, event_id, name, nickname, image_url, handicap, starting_score, created_at"
-      )
+      .select("*")
       .eq("event_id", eventId)
       .order("name", { ascending: true }),
     supabaseAdmin
       .from("round_holes")
       .select("id, round_id, hole_number, par")
-      .eq("round_id", roundId),
-    supabaseAdmin
-      .from("round_players")
-      .select("id, round_id, player_id")
       .eq("round_id", roundId),
     supabaseAdmin
       .from("scores")
@@ -65,7 +57,6 @@ export default async function AdminRoundScoresPage({
 
   const players = (playersData ?? []) as PlayerRow[];
   const holes = (holesData ?? []) as RoundHoleRow[];
-  const roundPlayers = (roundPlayersData ?? []) as RoundPlayerRow[];
   const scores = (scoresData ?? []) as ScoreRow[];
 
   return (
@@ -101,8 +92,8 @@ export default async function AdminRoundScoresPage({
         holes={holes}
         players={players}
         round={round}
-        roundPlayers={roundPlayers}
         scores={scores}
+        playersError={playersError?.message ?? null}
       />
     </section>
   );

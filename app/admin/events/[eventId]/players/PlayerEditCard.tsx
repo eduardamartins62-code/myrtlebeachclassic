@@ -3,24 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Database } from "@/lib/database.types";
-import PlayerAssignmentForm from "./PlayerAssignmentForm";
 
 type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
-type RoundRow = Database["public"]["Tables"]["rounds"]["Row"];
 
 type PlayerEditCardProps = {
-  eventId: string;
   player: PlayerRow;
-  rounds: RoundRow[];
-  assignedRoundIds: string[];
 };
 
-export default function PlayerEditCard({
-  eventId,
-  player,
-  rounds,
-  assignedRoundIds
-}: PlayerEditCardProps) {
+export default function PlayerEditCard({ player }: PlayerEditCardProps) {
   const router = useRouter();
   const [name, setName] = useState(player.name);
   const [nickname, setNickname] = useState(player.nickname ?? "");
@@ -190,14 +180,6 @@ export default function PlayerEditCard({
         </button>
       </form>
 
-      <div className="mt-4">
-        <PlayerAssignmentForm
-          assignedRoundIds={assignedRoundIds}
-          eventId={eventId}
-          playerId={player.id}
-          rounds={rounds}
-        />
-      </div>
     </div>
   );
 }

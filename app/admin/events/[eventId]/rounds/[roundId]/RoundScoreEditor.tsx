@@ -7,16 +7,15 @@ import { updateHolePar, updateScore } from "./actions";
 type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
 type RoundRow = Database["public"]["Tables"]["rounds"]["Row"];
 type RoundHoleRow = Database["public"]["Tables"]["round_holes"]["Row"];
-type RoundPlayerRow = Database["public"]["Tables"]["round_players"]["Row"];
 type ScoreRow = Database["public"]["Tables"]["scores"]["Row"];
 
 type RoundScoreEditorProps = {
   eventId: string;
   round: RoundRow;
   players: PlayerRow[];
-  roundPlayers: RoundPlayerRow[];
   holes: RoundHoleRow[];
   scores: ScoreRow[];
+  playersError: string | null;
 };
 
 const holeNumbers = Array.from({ length: 18 }, (_, index) => index + 1);
@@ -40,20 +39,10 @@ export default function RoundScoreEditor({
   eventId,
   round,
   players,
-  roundPlayers,
   holes,
-  scores
+  scores,
+  playersError
 }: RoundScoreEditorProps) {
-  const assignedPlayerIds = useMemo(
-    () => new Set(roundPlayers.map((assignment) => assignment.player_id)),
-    [roundPlayers]
-  );
-
-  const visiblePlayers =
-    assignedPlayerIds.size > 0
-      ? players.filter((player) => assignedPlayerIds.has(player.id))
-      : players;
-
   const [parByHole, setParByHole] = useState<Record<number, number>>(() => {
     const initial: Record<number, number> = {};
     holes.forEach((hole) => {
@@ -144,7 +133,7 @@ export default function RoundScoreEditor({
       string,
       { strokes: number | null; toPar: number | null }
     >();
-    visiblePlayers.forEach((player) => {
+    players.forEach((player) => {
       let totalStrokes = 0;
       let totalPar = 0;
       let hasScores = false;
@@ -165,14 +154,23 @@ export default function RoundScoreEditor({
       });
     });
     return totals;
-  }, [scoreByKey, parByHole, visiblePlayers]);
+  }, [scoreByKey, parByHole, players]);
 
-  if (visiblePlayers.length === 0) {
+  if (playersError && players.length === 0) {
+    return (
+      <div className="rounded-3xl border border-dashed border-rose-200 bg-white p-8 text-center shadow-sm">
+        <p className="text-base text-rose-500">
+          Unable to load players: {playersError}
+        </p>
+      </div>
+    );
+  }
+
+  if (players.length === 0) {
     return (
       <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
         <p className="text-base text-slate-600">
-          No players are assigned to this round yet. Assign players from the
-          event roster.
+          No players have been added to this event yet.
         </p>
       </div>
     );
@@ -216,6 +214,11 @@ export default function RoundScoreEditor({
             {isPending ? "Saving updates..." : "Autosave on blur"}
           </p>
         </div>
+        {playersError ? (
+          <p className="mt-3 text-sm text-rose-500">
+            Unable to load players: {playersError}
+          </p>
+        ) : null}
         {error ? <p className="mt-3 text-sm text-rose-500">{error}</p> : null}
         <div className="mt-4 overflow-auto rounded-2xl border border-slate-200">
           <table className="min-w-[900px] w-full text-left text-xs">
@@ -235,7 +238,7 @@ export default function RoundScoreEditor({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 text-sm">
-              {visiblePlayers.map((player) => {
+              {players.map((player) => {
                 const totals = totalsByPlayer.get(player.id);
                 return (
                   <tr key={player.id}>
